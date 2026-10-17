@@ -15,7 +15,7 @@ Ride Master owns no taxis. It is a marketplace connecting riders with licensed t
 | Role | Who | Interface | Main job |
 | --- | --- | --- | --- |
 | SuperAdmin | Ride Master team | Admin panel (web) | Control the platform, approve companies, set commission, handle disputes |
-| Company | Taxi company owner/manager, or an independent driver with 1 or 2 cars | Owner dashboard (web) | Manage fleet, drivers, prices, earnings |
+| Company | Taxi company owner/manager, or an independent driver with 1 to 3 cars | Owner dashboard (web) | Manage fleet, drivers, prices, earnings |
 | Driver | Employee of a company, or the independent owner themselves | Driver screen (mobile web/PWA) | Go online, accept rides, complete trips |
 | Rider | Customer | Rider site (mobile-first PWA) | Search, book, track, pay, rate |
 
@@ -23,9 +23,9 @@ All four use one web app and one backend. The login decides which interface they
 
 ### Independent drivers (owner-operators)
 
-A driver with one or two cars and no company registers as a company of type **Individual**. The platform treats them exactly like a one-person company, so nothing else in the system changes.
+A driver with up to three cars and no company registers as a company of type **Individual**. The platform treats them exactly like a one-person company, so nothing else in the system changes.
 
-- They add their 1 or 2 vehicles and set their own fares, or accept the suggested standard fares in one tap.
+- They add their 1 to 3 vehicles and set their own fares, or accept the suggested standard fares in one tap.
 - One login gives them two screens: the **driver screen** (go online, accept rides) and the **owner dashboard** (fares, earnings, statements).
 - If they later hire a driver, they add that person under their own account.
 - They are verified like any company: personal taxi licence, vehicle registration, insurance, ID.
@@ -75,9 +75,9 @@ A driver with one or two cars and no company registers as a company of type **In
 
 ## 4. Key Business Rules
 
-1. **Fixed fares per route/zone**, set by each company. The rider sees the final price before booking.
+1. **Fixed fares per route/zone**, set by each company. The rider sees the final price (fare plus any surcharge, such as night or airport) before booking.
 2. **Price changes apply only to new bookings.** An accepted ride keeps its price.
-3. **A company appears in search only if** it is approved, not suspended, has an online driver, and has a vehicle matching the request.
+3. **A company appears in search only if** it is approved, not suspended, has no expired documents, has a fare for the route, has at least one online and idle driver whose vehicle has enough seats, and has not passed its commission balance limit.
 4. **First driver to accept wins.** Requests go to online drivers of the chosen company; others are told the ride is taken.
 5. **Request timeout:** if no driver accepts within 60 to 90 seconds, the rider is told and offered other companies.
 6. **Commission** is calculated per completed ride from a rule set by SuperAdmin (default percent, overridable per company).
@@ -104,37 +104,52 @@ Every change of state is saved with time, who did it and why. This history is wh
 
 ## 6. Database Design
 
-**Recommended database:** PostgreSQL. It handles relations, transactions (important for money) and geo queries (PostGIS extension for distance and location). Use **Redis** alongside it for live driver locations and ride-request timeouts.
+**Recommended database:** MySQL 8.4 with InnoDB. It handles relations and transactions (important for money) and has built-in spatial types for zones. The full MySQL schema is in the separate document Ride Master: MySQL Database Design. The table list below follows it. If a column name here differs from the MySQL document, the MySQL document wins. Use **Redis** alongside it for live driver locations and ride-request timeouts.
+
+### MySQL conventions
+
+The complete SQL is in [Ride Master: MySQL Database Design](https://claude.ai/code/artifact/7fa996ea-f241-4d20-aa2f-474a6ef59d9c). The rules that shape every table below:
+
+- **Engine and encoding:** InnoDB with utf8mb4, so Dhivehi (Thaana) text is stored correctly.
+- **Ids:** each table has an internal BIGINT id and a public\_id (ULID). The API shows only public\_id, so ids cannot be guessed.
+- **Money:** whole numbers in laari (1 MVR = 100 laari). Percentages are in basis points (10% = 1000). No decimals for money.
+- **Time:** DATETIME(3) stored in UTC and shown in Maldives time.
+- **Statuses:** VARCHAR fields with CHECK constraints, not ENUM, so they are easy to change later.
+- **Zones:** spatial POLYGON columns with a spatial index. Live driver positions stay in Redis.
+- **Rules the database enforces by itself:** one open assignment per vehicle and per driver, one active ride per driver, one booking per idempotency key, one commission charge per booking, one rating per booking, one booking per settlement line.
+- **Foreign keys** are real constraints, and users, companies, drivers and vehicles are soft deleted.
 
 ### 6.1 Identity and Access
 
-**users**: id, full\_name, phone (unique), email (optional), password\_hash (for staff roles), status (active / suspended / deleted), language, last\_login\_at, created\_at
+**users**: id, full\_name, phone (unique), email (optional), password\_hash and totp\_secret\_enc (admin only), status (active / suspended / deleted), language, last\_login\_at, deleted\_at, created\_at
 
 **user\_roles**: id, user\_id, role (superadmin / company\_owner / driver / rider), company\_id (empty for rider and superadmin), admin\_level (super / verifier / support / finance, only for superadmin), status, created\_at. One user can hold several roles. An independent driver has two rows: company\_owner and driver, both for the same company.
 
 **otp\_codes**: id, phone, code\_hash, purpose, expires\_at, attempts, used\_at
 
-**sessions**: id, user\_id, token\_hash, device\_info, expires\_at, revoked\_at
+**sessions**: id, user\_id, refresh\_token\_hash, device\_info, expires\_at, revoked\_at
 
 **user\_consents**: id, user\_id, document (terms, privacy policy, operator agreement), version, accepted\_at, ip\_address (proof of what each person agreed to and when)
 
-**permissions** and **role\_permissions** (optional): lets SuperAdmin staff have different levels later (support, finance, verifier).
+**permissions** and **role\_permissions** (optional, later): only needed if the four admin levels turn out to be too limited.
 
 ### 6.2 Companies
 
-**companies**: id, owner\_user\_id, type (company / individual), name, trade\_name, registration\_number, licence\_number, phone, email, logo\_url, service\_areas, status (pending / approved / rejected / suspended), commission\_override\_percent, rating\_avg, approved\_by, approved\_at, created\_at
+**companies**: id, owner\_user\_id, type (company / individual), name, trade\_name, registration\_number, licence\_number, phone, email, logo\_key, status (pending / approved / rejected / suspended), commission\_override\_bps, balance\_limit\_laari, rating\_avg, approved\_by, approved\_at, created\_at
 
-**company\_documents**: id, company\_id, type (licence, registration, insurance), file\_url, expiry\_date, verified\_by, verified\_at, status
+**company\_documents**: id, company\_id, type (licence, registration, insurance), file\_key, expiry\_date, verified\_by, verified\_at, status
+
+**company\_service\_areas**: company\_id, area\_id (composite key). It replaces the old service\_areas list on companies.
 
 **company\_staff** (optional): id, company\_id, user\_id, staff\_role (manager, dispatcher), so an owner can add managers.
 
 ### 6.3 Fleet and Drivers
 
-**vehicle\_types**: id, name (standard car, van, 6-seater, luxury), seats, description (managed by SuperAdmin so all companies use the same categories)
+**vehicle\_types**: id, name (standard car, van, 6-seater, luxury), seats, luggage\_capacity, sort\_order (managed by SuperAdmin so all companies use the same categories)
 
 **vehicles**: id, company\_id, vehicle\_type\_id, plate\_number (unique), make, model, year, colour, insurance\_expiry, status (active / maintenance / retired)
 
-**drivers**: id, user\_id, company\_id, licence\_number, licence\_expiry, id\_card\_number, photo\_url, status (pending / active / suspended), rating\_avg, created\_at
+**drivers**: id, user\_id, company\_id, licence\_number, licence\_expiry, id\_card\_number\_enc (encrypted), photo\_key, status (pending / active / suspended), rating\_avg, created\_at
 
 **driver\_vehicle\_assignments**: id, driver\_id, vehicle\_id, assigned\_from, assigned\_to (a driver may share vehicles over shifts)
 
@@ -142,53 +157,55 @@ Every change of state is saved with time, who did it and why. This history is wh
 
 ### 6.4 Areas and Pricing
 
-**areas**: id, name (Malé, Hulhumalé Phase 1, Phase 2, Villimalé, Airport), type, polygon (geo shape), active
+**areas**: id, name (Malé, Hulhumalé Phase 1, Phase 2, Villimalé, Airport), type, geometry (spatial polygon), active
 
-**fares**: id, company\_id, vehicle\_type\_id, from\_area\_id, to\_area\_id, price\_mvr, valid\_from, valid\_to, active
+**suggested\_fares**: id, from\_area\_id, to\_area\_id, vehicle\_type\_id, price\_laari (set by SuperAdmin; new operators and independent drivers accept these in one tap)
 
-**surcharges**: id, company\_id, name (night, airport, extra luggage), amount or percent, time\_window, active
+**fares**: id, company\_id, vehicle\_type\_id, from\_area\_id, to\_area\_id, price\_laari, valid\_from, valid\_to, active
 
-**fare\_history**: id, fare\_id, old\_price, new\_price, changed\_by, changed\_at (full price audit trail)
+**surcharges**: id, company\_id, name (night, airport, extra luggage), amount\_laari or percent\_bps, time\_from, time\_to, active
+
+**fare\_history**: id, fare\_id, old\_price\_laari, new\_price\_laari, changed\_by, changed\_at (full price audit trail)
 
 ### 6.5 Bookings
 
 **saved\_places**: id, user\_id, label, address, lat, lng
 
-**bookings**: id, rider\_id, company\_id, driver\_id, vehicle\_id, vehicle\_type\_id, passengers, luggage\_count, pickup\_address, pickup\_lat, pickup\_lng, dropoff\_address, dropoff\_lat, dropoff\_lng, from\_area\_id, to\_area\_id, quoted\_price, final\_price, commission\_percent, commission\_amount, payment\_method, payment\_status, status, requested\_at, accepted\_at, arrived\_at, started\_at, completed\_at, cancelled\_at, cancel\_reason, cancelled\_by
+**bookings**: id, rider\_id, company\_id, driver\_id, vehicle\_id, vehicle\_type\_id, passengers, luggage\_count, pickup\_address, pickup\_lat, pickup\_lng, dropoff\_address, dropoff\_lat, dropoff\_lng, from\_area\_id, to\_area\_id, quoted\_price\_laari, final\_price\_laari, tax\_laari, commission\_bps, commission\_laari, idempotency\_key, payment\_method, payment\_status, status, requested\_at, accepted\_at, arrived\_at, started\_at, completed\_at, cancelled\_at, cancel\_reason, cancelled\_by
 
 **booking\_offers**: id, booking\_id, driver\_id, sent\_at, response (accepted / declined / timeout), responded\_at
 
-**booking\_status\_history**: id, booking\_id, from\_status, to\_status, changed\_by\_user\_id, note, created\_at
+**booking\_status\_history**: id, booking\_id, from\_status, to\_status, changed\_by, note, created\_at
 
 **booking\_locations** (optional): booking\_id, lat, lng, recorded\_at (breadcrumb trail for disputes)
 
 ### 6.6 Money
 
-**commission\_rules**: id, scope (global / company), company\_id, percent, fixed\_fee, valid\_from, valid\_to
+**commission\_rules**: id, scope (global / company), company\_id, percent\_bps, fixed\_fee\_laari, valid\_from, valid\_to
 
-**payments**: id, booking\_id, method (cash / card / wallet), amount, status, provider\_reference, paid\_at
+**payments**: id, booking\_id, method (cash / card / wallet), amount\_laari, status, provider\_reference, paid\_at
 
-**settlement\_statements**: id, company\_id, period\_start, period\_end, total\_rides, gross\_fares, commission\_due, net\_to\_company, status (open / issued / paid), issued\_at, paid\_at
+**settlement\_statements**: id, company\_id, period\_start, period\_end, total\_rides, gross\_laari, commission\_laari, net\_laari, status (open / issued / paid), issued\_at, paid\_at
 
-**settlement\_lines**: id, statement\_id, booking\_id, fare, commission
+**settlement\_lines**: id, statement\_id, booking\_id (unique), fare\_laari, commission\_laari
 
-**refunds**: id, booking\_id, amount, reason, approved\_by, status, created\_at
+**refunds**: id, booking\_id, amount\_laari, reason, approved\_by, status, created\_at
 
-**company\_ledger**: id, company\_id, type (top-up, commission charge, adjustment, payout), amount, balance\_after, booking\_id, created\_at. For cash rides, the commission is charged to this balance. If it drops below the limit set by SuperAdmin, the company stops receiving new requests until it tops up.
+**company\_ledger**: id, company\_id, type (top-up, commission charge, adjustment, payout), amount\_laari, balance\_after\_laari, booking\_id, created\_at. For cash rides, the commission is charged to this balance. A company may owe up to its balance limit, set by SuperAdmin (give new companies a small starting credit so their first rides are not blocked). Beyond that limit it stops receiving new requests until it tops up.
 
 ### 6.7 Trust, Support and System
 
-**ratings**: id, booking\_id, rider\_id, driver\_id, company\_id, rating\_for\_driver, rating\_for\_company, comment, created\_at
+**ratings**: id, booking\_id, rider\_id, driver\_id, company\_id, driver\_score, company\_score, comment, created\_at
 
-**rider\_ratings**: id, booking\_id, driver\_id, rider\_id, rating, comment, created\_at (drivers rate riders too, so repeat no-shows or abuse can lead to a warning or ban)
+**rider\_ratings**: id, booking\_id, driver\_id, rider\_id, score, comment, created\_at (drivers rate riders too, so repeat no-shows or abuse can lead to a warning or ban)
 
-**complaints**: id, booking\_id, raised\_by\_user\_id, against (driver / company / rider), category, description, status, resolution, resolved\_by, created\_at, resolved\_at
+**complaints**: id, booking\_id, raised\_by, against\_type (driver / company / rider), category, description, status, resolution, resolved\_by, created\_at, resolved\_at
 
 **notifications**: id, user\_id, channel (push / sms / in-app), title, body, read\_at, sent\_at
 
-**audit\_logs**: id, actor\_user\_id, action, entity\_type, entity\_id, old\_value, new\_value, ip\_address, created\_at
+**audit\_logs**: id, actor\_user\_id, action, entity\_type, entity\_id, old\_value (JSON), new\_value (JSON), ip\_address, created\_at
 
-**platform\_settings**: key, value (default commission, request timeout, search radius, cancellation window)
+**platform\_settings**: setting\_key, value as JSON (default commission, request timeout, search radius, cancellation window)
 
 ### 6.8 Relationship Summary
 
@@ -197,13 +214,13 @@ Every change of state is saved with time, who did it and why. This history is wh
 - A booking belongs to one rider, one company, one driver, one vehicle.
 - A settlement statement groups many completed bookings for one company.
 
-**Indexes to add early:** bookings(rider\_id), bookings(company\_id, status), bookings(driver\_id), fares(company\_id, from\_area\_id, to\_area\_id), driver\_status(state), and a geo index on locations.
+**Indexes to add early:** bookings(rider\_id), bookings(company\_id, status), bookings(driver\_id), fares(from\_area\_id, to\_area\_id, vehicle\_type\_id, active), driver\_status(state), and a spatial index on areas.
 
 ## 7. Technical Architecture
 
 - **Frontend:** Next.js (React), PWA enabled, Tailwind CSS. Mobile-first for rider and driver, desktop layout for company and admin.
 - **Backend:** Node.js (NestJS or Express) or Django REST. REST API plus WebSockets.
-- **Database:** PostgreSQL + PostGIS, Redis for live state and queues.
+- **Database:** MySQL 8.4 (InnoDB, utf8mb4), Redis for live state and queues.
 - **Real-time:** WebSockets for new ride requests, driver location, booking status.
 - **Maps:** Google Maps or Mapbox for maps, geocoding, distance and ETA.
 - **Notifications:** Web push, plus SMS fallback for critical events (ride request, ride accepted).
@@ -212,11 +229,21 @@ Every change of state is saved with time, who did it and why. This history is wh
 - **Hosting:** a cloud server in the nearest region (Singapore or Mumbai), with daily database backups, monitoring and error tracking.
 - **Environments:** development, staging, production.
 
+**MySQL setup and operations:**
+
+- **Hosting:** managed MySQL 8.4 (for example AWS RDS or DigitalOcean) with automatic daily snapshots and point-in-time recovery from the binary log.
+- **Connections:** a pool of 10 to 20 connections per API instance; add ProxySQL when running several instances.
+- **Concurrency:** booking and ledger changes use short READ COMMITTED transactions with retry on deadlock. Accepting a ride is one conditional UPDATE, so exactly one driver wins.
+- **Live data:** Redis GEO holds driver positions and finds the nearest drivers. MySQL keeps only the last known position.
+- **Scaling later:** add a read replica for admin reports and statements, and partition booking\_locations and audit\_logs by month once they are very large.
+- **Retention:** a nightly job deletes old trip locations, OTP codes, expired sessions and old notifications in small batches.
+- **Monitoring:** slow query log at 200 ms, reviewed weekly.
+
 **Request flow for a search:** rider enters route → backend finds approved companies with online drivers → looks up each company's fare for that route and vehicle type → computes ETA from nearest online driver → returns a sorted list in one response.
 
 ## 8. Security and Privacy
 
-- Phone OTP for riders and drivers; password plus 2FA for SuperAdmin.
+- Phone OTP for riders, drivers and company owners; password plus 2FA for SuperAdmin. One active session per driver.
 - HTTPS everywhere, hashed passwords and OTPs, rate limits on OTP and login.
 - Role and company checks on every API endpoint.
 - Private document storage with expiring links.
@@ -224,6 +251,14 @@ Every change of state is saved with time, who did it and why. This history is wh
 - Share driver name, plate and photo with the rider only after acceptance; hide rider phone behind masked calling or in-app contact if possible.
 - Audit logs for all admin and financial actions; backups tested by actually restoring.
 - Follow Maldives data protection and consumer rules; get local legal advice.
+
+**Database security (MySQL):**
+
+- A dedicated database user with only the rights the app needs, never root.
+- TLS between the app and the database, and encrypted disks and backups.
+- Encrypt sensitive columns in the app (ID card numbers, 2FA secrets) and never log them.
+- Strict SQL mode on every connection, and parameterised queries only.
+- Separate database credentials for production, staging and development.
 
 ## 9. Roadmap
 
@@ -241,9 +276,11 @@ Every change of state is saved with time, who did it and why. This history is wh
 
 ### Phase 1: MVP Build (Weeks 5 to 14)
 
+**Timeline check:** 10 weeks assumes at least three developers working in parallel. With one developer plus an AI agent building phase by phase, plan for roughly 16 to 20 weeks and move the pilot and launch dates by the same amount.
+
 **Sprint 1 (Weeks 5 to 6): Foundation**
 
-- Project setup, database, authentication, roles and permissions, audit logging.
+- Project setup, authentication, roles and permissions, audit logging. Write the MySQL migrations (spatial columns, generated columns and CHECK constraints in raw SQL), seed the five zones and demo data, add a concurrency test for ride acceptance, and set up English and Dhivehi (right-to-left) support.
 
 **Sprint 2 (Weeks 7 to 8): Company side and SuperAdmin**
 
@@ -259,7 +296,7 @@ Every change of state is saved with time, who did it and why. This history is wh
 
 **Sprint 5 (Weeks 13 to 14): Money and polish**
 
-- Cash payment flow, commission calculation, settlement statements, ratings, notifications, PWA install.
+- Cash payment flow, commission calculation and company ledger, settlement statements, ratings, complaints and refunds (handled manually by admin), notifications, document expiry job, admin KPI dashboard, Dhivehi translations, PWA install.
 
 **MVP scope (in):** fixed fares, cash payment, 1 corridor, online drivers only, manual dispute handling. **MVP scope (out):** in-app card payments, scheduled rides, promo codes, multi-stop trips, native apps.
 
@@ -267,7 +304,7 @@ Every change of state is saved with time, who did it and why. This history is wh
 
 - Internal testing with test accounts for every role.
 - Test on real phones and real mobile networks (weak signal, switching between Wi-Fi and data).
-- Security review and a load test.
+- Security review, a load test, and a MySQL backup and restore drill.
 - Pilot with 2 to 3 companies and 10 to 20 drivers, invited riders only.
 - Daily check-ins with drivers, weekly with owners.
 - Fix the top issues: lost requests, location drift, confusing screens.
@@ -336,13 +373,23 @@ A solo founder with a developer can still do it, but expect the timeline to stre
 | Weak internet | App feels broken | Light pages, retry logic, offline-friendly screens |
 | Payment and cash leakage | Commission not collected | Monthly statements, deposit or prepaid balance for companies, suspension for late payment |
 
+### Added in final review
+
+- **Weak street addressing:** Google Maps knows few street names in Hulhumalé. Let riders drop a pin, pick saved places and landmarks, and choose the zone, so pickup does not depend on a typed address.
+- **Redis is a single point of failure for availability:** use a managed Redis with a replica, and if it is down, fall back to the last\_seen time in driver\_status.
+- **SMS cost and abuse:** OTP texts cost money and can be abused. Rate limit per number and per device, and set a daily SMS budget alert.
+- **Shared driver accounts:** one active session per driver, and a new login signs the old device out.
+- **Surcharge surprises:** the quoted price already includes surcharges, and the rider sees the total before booking.
+- **Starting credit:** a new company with a zero balance and a zero limit would be blocked after its first cash ride, so set a small starting credit.
+- **No budget yet:** this plan has no cost figures. Get quotes for development, managed MySQL and Redis, SMS and maps before committing.
+
 ## 13. Launch Checklist
 
 - Legal and licensing confirmed in writing
 - Operator agreement signed by every pilot company
 - All four role interfaces tested end to end
 - Role permission tests passed (a company cannot see another company's data)
-- Backups and restore tested
+- MySQL backups, point-in-time recovery and restore tested
 - SMS/OTP delivery tested on Dhiraagu and Ooredoo numbers
 - Support phone/WhatsApp and complaint process ready
 - Privacy policy, terms of use and cancellation policy published
@@ -381,6 +428,18 @@ I walked the plan through seven journeys: company onboarding, independent driver
 | Phone numbers | Duplicate or badly formatted numbers | Normalise to +960 format; one account per number |
 | Taxes | GST on fares and on the commission not handled | Store tax amount per booking; confirm treatment with an accountant before launch |
 | Data retention | No rule for deleting old data | Keep ride records for the legal period; delete locations after a set time; let users request account deletion |
+
+### MySQL-specific risks found
+
+Moving to MySQL exposed a second set of traps, each already handled in the schema:
+
+- **No partial indexes:** rules like one active ride per driver use generated columns with UNIQUE keys.
+- **NULL breaks uniqueness:** user\_roles has a nullable company, so a generated key keeps it unique.
+- **Inline foreign keys are ignored:** all foreign keys are written as table-level constraints.
+- **Date limit:** TIMESTAMP stops at 2038, so DATETIME(3) in UTC is used.
+- **Coordinate order:** spatial zones use one fixed order (longitude, latitude) to avoid swapped coordinates.
+- **Double commission:** a unique key on the ledger blocks a second charge for the same booking.
+- **Money rounding:** all amounts are integers in laari, never decimals.
 
 ### Still open: needs your decision
 
