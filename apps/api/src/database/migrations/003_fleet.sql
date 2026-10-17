@@ -6,8 +6,6 @@
 --   • One active trip per driver at a time
 -- =============================================================================
 
-USE ride_master;
-
 -- ── vehicle_types ─────────────────────────────────────────────────────────────
 CREATE TABLE vehicle_types (
   id               BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -43,13 +41,10 @@ CREATE TABLE vehicles (
   PRIMARY KEY (id),
   UNIQUE KEY uq_vehicles_public_id    (public_id),
   UNIQUE KEY uq_vehicles_plate_number (plate_number),
-  CONSTRAINT chk_vehicles_status FOREIGN KEY (company_id)      REFERENCES companies    (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_vehicles_type    FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types (id) ON DELETE RESTRICT
+  CONSTRAINT chk_vehicles_status CHECK (status IN ('active', 'maintenance', 'retired')),
+  CONSTRAINT fk_vehicles_company  FOREIGN KEY (company_id)      REFERENCES companies    (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_vehicles_type     FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- Correct the CHECK constraint (separated from FK alias)
-ALTER TABLE vehicles
-  ADD CONSTRAINT chk_vehicles_status_val CHECK (status IN ('active', 'maintenance', 'retired'));
 
 CREATE INDEX idx_vehicles_company_id ON vehicles (company_id);
 
@@ -83,6 +78,8 @@ CREATE INDEX idx_drivers_status     ON drivers (status);
 -- ── driver_vehicle_assignments ────────────────────────────────────────────────
 -- Generated columns enforce one open (assigned_to IS NULL) assignment per driver
 -- and per vehicle using UNIQUE keys on generated columns.
+-- NULL (not 0) marks closed rows: MySQL UNIQUE allows many NULLs, so history
+-- rows never collide with each other — only the single open row per key matters.
 CREATE TABLE driver_vehicle_assignments (
   id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
   public_id       CHAR(26)         NOT NULL,
@@ -90,12 +87,12 @@ CREATE TABLE driver_vehicle_assignments (
   vehicle_id      BIGINT UNSIGNED  NOT NULL,
   assigned_from   DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   assigned_to     DATETIME(3)      NULL     COMMENT 'NULL = currently active',
-  -- Generated: driver_id when open, else 0 (allows UNIQUE key for open assignments)
-  open_driver_key BIGINT UNSIGNED  NOT NULL
-    GENERATED ALWAYS AS (IF(assigned_to IS NULL, driver_id, 0)) STORED,
-  -- Generated: vehicle_id when open, else 0
-  open_vehicle_key BIGINT UNSIGNED NOT NULL
-    GENERATED ALWAYS AS (IF(assigned_to IS NULL, vehicle_id, 0)) STORED,
+  -- Generated: driver_id while open, else NULL (UNIQUE ⇒ one open per driver)
+  open_driver_key BIGINT UNSIGNED
+    GENERATED ALWAYS AS (IF(assigned_to IS NULL, driver_id, NULL)) STORED,
+  -- Generated: vehicle_id while open, else NULL (UNIQUE ⇒ one open per vehicle)
+  open_vehicle_key BIGINT UNSIGNED
+    GENERATED ALWAYS AS (IF(assigned_to IS NULL, vehicle_id, NULL)) STORED,
   created_at      DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   UNIQUE KEY uq_dva_public_id        (public_id),
@@ -118,9 +115,9 @@ CREATE TABLE driver_status (
   last_lat           DECIMAL(10,7)    NULL,
   last_lng           DECIMAL(10,7)    NULL,
   last_seen_at       DATETIME(3)      NULL,
-  -- Generated: driver_id when on_trip, else 0 (ensures one active trip)
-  on_trip_key        BIGINT UNSIGNED  NOT NULL
-    GENERATED ALWAYS AS (IF(state = 'on_trip', driver_id, 0)) STORED,
+  -- Generated: driver_id while on_trip, else NULL (UNIQUE ⇒ one active trip)
+  on_trip_key        BIGINT UNSIGNED
+    GENERATED ALWAYS AS (IF(state = 'on_trip', driver_id, NULL)) STORED,
   updated_at         DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (driver_id),
   UNIQUE KEY uq_driver_status_on_trip (on_trip_key),
@@ -130,5 +127,3 @@ CREATE TABLE driver_status (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE INDEX idx_driver_status_state ON driver_status (state);
-
-INSERT INTO schema_migrations (version) VALUES ('003_fleet');

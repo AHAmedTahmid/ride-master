@@ -2,8 +2,6 @@
 -- Migration 002: Companies
 -- =============================================================================
 
-USE ride_master;
-
 -- ── companies ─────────────────────────────────────────────────────────────────
 CREATE TABLE companies (
   id                       BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -82,8 +80,7 @@ CREATE TABLE company_staff (
   PRIMARY KEY (id),
   UNIQUE KEY uq_company_staff_public_id (public_id),
   UNIQUE KEY uq_company_staff_combo (company_id, user_id),
-  CONSTRAINT chk_company_staff_role FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
-  CONSTRAINT fk_company_staff_user  FOREIGN KEY (user_id)    REFERENCES users     (id) ON DELETE RESTRICT
+  CONSTRAINT chk_company_staff_role  CHECK (staff_role IN ('manager', 'dispatcher')),
+  CONSTRAINT fk_company_staff_company FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
+  CONSTRAINT fk_company_staff_user   FOREIGN KEY (user_id)    REFERENCES users     (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-INSERT INTO schema_migrations (version) VALUES ('002_companies');

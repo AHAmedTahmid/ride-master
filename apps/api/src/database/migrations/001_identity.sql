@@ -4,18 +4,9 @@
 -- All PKs: BIGINT UNSIGNED AUTO_INCREMENT
 -- All public IDs: CHAR(26) ULID
 -- All timestamps: DATETIME(3) UTC
+-- No USE statements: the migration runner connects to the target database.
+-- Schema version tracking is owned by the runner (schema_migrations table).
 -- =============================================================================
-
-USE ride_master;
-
--- ── Schema version tracking ───────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS schema_migrations (
-  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  version     VARCHAR(50)     NOT NULL,
-  applied_at  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_schema_migrations_version (version)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ── users ─────────────────────────────────────────────────────────────────────
 CREATE TABLE users (
@@ -53,8 +44,8 @@ CREATE TABLE user_roles (
   admin_level           VARCHAR(32)      NULL     COMMENT 'super | verifier | support | finance',
   status                VARCHAR(32)      NOT NULL DEFAULT 'active',
   -- Generated column: coalesce company_id to 0 for uniqueness key
-  company_id_key        BIGINT UNSIGNED  NOT NULL
-    GENERATED ALWAYS AS (COALESCE(company_id, 0)) STORED,
+  company_id_key        BIGINT UNSIGNED
+    GENERATED ALWAYS AS (COALESCE(company_id, 0)) STORED NOT NULL,
   created_at            DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at            DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
@@ -127,6 +118,3 @@ CREATE TABLE user_consents (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE INDEX idx_user_consents_user_id ON user_consents (user_id);
-
--- Record this migration
-INSERT INTO schema_migrations (version) VALUES ('001_identity');

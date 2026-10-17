@@ -5,8 +5,6 @@
 -- settlement_lines: UNIQUE on booking_id prevents a booking appearing twice.
 -- =============================================================================
 
-USE ride_master;
-
 -- ── commission_rules ──────────────────────────────────────────────────────────
 CREATE TABLE commission_rules (
   id               BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -140,5 +138,3 @@ CREATE TABLE refunds (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE INDEX idx_refunds_booking_id ON refunds (booking_id);
-
-INSERT INTO schema_migrations (version) VALUES ('006_money');

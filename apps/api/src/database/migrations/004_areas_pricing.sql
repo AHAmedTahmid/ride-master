@@ -4,8 +4,6 @@
 -- Coordinate order: (longitude, latitude) — consistent throughout.
 -- =============================================================================
 
-USE ride_master;
-
 -- ── areas ─────────────────────────────────────────────────────────────────────
 CREATE TABLE areas (
   id         BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -110,5 +108,3 @@ CREATE TABLE fare_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE INDEX idx_fare_history_fare_id ON fare_history (fare_id);
-
-INSERT INTO schema_migrations (version) VALUES ('004_areas_pricing');

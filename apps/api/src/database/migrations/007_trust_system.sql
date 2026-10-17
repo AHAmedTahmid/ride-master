@@ -4,8 +4,6 @@
 -- platform_settings: key-value store with JSON values; default rows inserted.
 -- =============================================================================
 
-USE ride_master;
-
 -- ── ratings ───────────────────────────────────────────────────────────────────
 CREATE TABLE ratings (
   id             BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -147,5 +145,3 @@ INSERT INTO platform_settings (setting_key, value, description) VALUES
   ('gst_rate_bps',                        '0',      'GST rate in basis points (0 until confirmed)'),
   ('daily_sms_budget',                    '1000',   'Max SMS messages per day before alert'),
   ('booking_locations_retention_days',    '90',     'Days to keep booking_locations before deletion');
-
-INSERT INTO schema_migrations (version) VALUES ('007_trust_system');

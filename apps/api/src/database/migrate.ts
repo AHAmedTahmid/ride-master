@@ -1,9 +1,14 @@
 #!/usr/bin/env ts-node
 /**
- * Migration runner: reads .sql files in numeric order, applies each to the
- * target database (defaults to DATABASE_URL, uses DATABASE_URL_TEST in test env).
- * Tracks applied migrations in schema_migrations table.
- * Safe to run multiple times (idempotent via INSERT IGNORE on schema_migrations).
+ * Migration runner.
+ *
+ * - Applies .sql files in apps/api/src/database/migrations in numeric order.
+ * - Tracks applied versions in schema_migrations (created if missing).
+ * - Target database comes from DATABASE_URL, or DATABASE_URL_TEST when NODE_ENV=test.
+ * - Never contains USE statements in migration files: the connection's default
+ *   database is the target, so the same file set works for dev, test and prod.
+ * - Statement splitter is quote- and comment-aware (strings, backticks, line and
+ *   block comments).
  */
 
 import * as fs from 'fs'
@@ -13,13 +18,11 @@ import * as dotenv from 'dotenv'
 
 dotenv.config({ path: path.join(__dirname, '../../../../.env') })
 
-const DB_URL =
-  process.env.NODE_ENV === 'test'
-    ? (process.env.DATABASE_URL_TEST ?? '')
-    : (process.env.DATABASE_URL ?? '')
+const isTest = process.env.NODE_ENV === 'test'
+const DB_URL = (isTest ? process.env.DATABASE_URL_TEST : process.env.DATABASE_URL) ?? ''
 
 if (!DB_URL) {
-  console.error('ERROR: DATABASE_URL is not set')
+  console.error(`ERROR: ${isTest ? 'DATABASE_URL_TEST' : 'DATABASE_URL'} is not set`)
   process.exit(1)
 }
 
@@ -28,21 +31,82 @@ function parseMysqlUrl(url: string) {
   return {
     host: u.hostname,
     port: u.port ? parseInt(u.port, 10) : 3306,
-    user: u.username,
-    password: u.password,
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
     database: u.pathname.replace(/^\//, ''),
-    multipleStatements: true,
+    multipleStatements: false,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : undefined,
   }
+}
+
+/**
+ * Strip comments and split SQL text into individual statements.
+ * Respects single quotes, double quotes and backtick identifiers so that
+ * semicolons inside string literals do not split a statement.
+ */
+export function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = []
+  let current = ''
+  let i = 0
+  let inSingle = false
+  let inDouble = false
+  let inBacktick = false
+
+  while (i < sql.length) {
+    const ch = sql[i]
+    const next = sql[i + 1]
+
+    // Line comments: -- ... and # ...
+    if (!inSingle && !inDouble && !inBacktick && (ch === '-' && next === '-')) {
+      while (i < sql.length && sql[i] !== '\n') i++
+      current += '\n'
+      i++
+      continue
+    }
+    if (!inSingle && !inDouble && !inBacktick && ch === '#') {
+      while (i < sql.length && sql[i] !== '\n') i++
+      current += '\n'
+      i++
+      continue
+    }
+    // Block comments: /* ... */
+    if (!inSingle && !inDouble && !inBacktick && ch === '/' && next === '*') {
+      i += 2
+      while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) i++
+      i += 2
+      continue
+    }
+
+    // Quote tracking (handles '' and "" and `` escapes)
+    if (!inDouble && !inBacktick && ch === "'") inSingle = !inSingle
+    else if (!inSingle && !inBacktick && ch === '"') inDouble = !inDouble
+    else if (!inSingle && !inDouble && ch === '`') inBacktick = !inBacktick
+
+    // Statement boundary: semicolon outside quotes at depth 0
+    if (ch === ';' && !inSingle && !inDouble && !inBacktick) {
+      const stmt = current.trim()
+      if (stmt.length > 0) statements.push(stmt)
+      current = ''
+      i++
+      continue
+    }
+
+    current += ch
+    i++
+  }
+
+  const tail = current.trim()
+  if (tail.length > 0) statements.push(tail)
+  return statements
 }
 
 async function run() {
   const config = parseMysqlUrl(DB_URL)
   const connection = await mysql.createConnection(config)
 
-  console.info(`[migrate] Connected to ${config.database} @ ${config.host}`)
+  console.info(`[migrate] Connected to ${config.database} @ ${config.host}:${config.port}`)
 
-  // Ensure schema_migrations table exists (created in 001 but we need it before running 001)
+  // The runner owns schema_migrations (migration files must not create or write it).
   await connection.execute(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -53,13 +117,29 @@ async function run() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
   `)
 
-  // Get already-applied versions
   const [rows] = await connection.execute<mysql.RowDataPacket[]>(
     'SELECT version FROM schema_migrations',
   )
   const applied = new Set(rows.map((r) => r.version as string))
 
-  // Read migration files in order
+  // Safety: DDL cannot be rolled back. If the database has tables but no
+  // recorded migrations, a previous run died halfway — refuse to guess.
+  if (applied.size === 0) {
+    const [tables] = await connection.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = ? AND table_name <> 'schema_migrations'",
+      [config.database],
+    )
+    if (Number(tables[0].n) > 0) {
+      console.error(
+        `[migrate] Database '${config.database}' has ${tables[0].n} table(s) but no recorded migrations.\n` +
+          `A previous migration run likely failed halfway. Drop and recreate the database, then re-run:\n` +
+          `  DROP DATABASE ${config.database}; CREATE DATABASE ${config.database} CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;`,
+      )
+      await connection.end()
+      process.exit(1)
+    }
+  }
+
   const migrationsDir = path.join(__dirname, 'migrations')
   const files = fs
     .readdirSync(migrationsDir)
@@ -68,28 +148,27 @@ async function run() {
 
   let ran = 0
   for (const file of files) {
-    const version = file.replace('.sql', '')
+    const version = file.replace(/\.sql$/, '')
     if (applied.has(version)) {
-      console.info(`[migrate] SKIP  ${file} (already applied)`)
+      console.info(`[migrate] SKIP  ${file}`)
       continue
     }
 
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8')
-
-    // Split on semicolons to execute statements individually
-    // (multipleStatements: true also works but explicit is safer with SPATIAL DDL)
-    const statements = sql
-      .split(/;\s*\n/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith('--'))
+    const statements = splitSqlStatements(sql).filter((s) => !/^use\s/i.test(s))
+    if (statements.length === 0) {
+      console.warn(`[migrate] WARN  ${file} contains no statements`)
+      continue
+    }
 
     try {
+      // MySQL DDL is non-transactional (each DDL statement implicit-commits),
+      // so statements run sequentially with fail-fast behaviour.
       for (const stmt of statements) {
-        if (stmt) {
-          await connection.execute(stmt)
-        }
+        await connection.execute(stmt)
       }
-      console.info(`[migrate] APPLY ${file}`)
+      await connection.execute('INSERT INTO schema_migrations (version) VALUES (?)', [version])
+      console.info(`[migrate] APPLY ${file} (${statements.length} statements)`)
       ran++
     } catch (err) {
       console.error(`[migrate] FAILED on ${file}:`, err)

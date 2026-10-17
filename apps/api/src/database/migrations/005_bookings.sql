@@ -3,8 +3,6 @@
 -- idempotency_key: unique so double-tap never creates two bookings.
 -- =============================================================================
 
-USE ride_master;
-
 -- ── saved_places ──────────────────────────────────────────────────────────────
 CREATE TABLE saved_places (
   id         BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -144,5 +142,3 @@ CREATE TABLE booking_locations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE INDEX idx_booking_locations_booking_id ON booking_locations (booking_id);
-
-INSERT INTO schema_migrations (version) VALUES ('005_bookings');
