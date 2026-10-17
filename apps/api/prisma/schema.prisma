@@ -1,0 +1,777 @@
+// Ride Master — Prisma schema.
+// Mapped 1:1 to the raw SQL migrations in src/database/migrations.
+// The SQL is authoritative: generated columns (open_driver_key, open_vehicle_key,
+// on_trip_key, company_id_key) and the GEOMETRY column are intentionally unmapped
+// here — Prisma never reads or writes them. Spatial queries go through $queryRaw.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Identity and access ────────────────────────────────────────────────────────
+
+model User {
+  id            BigInt    @id @default(autoincrement())
+  publicId      String    @unique @db.Char(26)
+  fullName      String    @db.VarChar(200)
+  phone         String    @unique @db.VarChar(20)
+  email         String?   @unique @db.VarChar(320)
+  passwordHash  String?   @map("password_hash") @db.VarChar(255)
+  totpSecretEnc String?   @map("totp_secret_enc") @db.VarChar(500)
+  status        String    @default("active") @db.VarChar(32)
+  language      String    @default("en") @db.VarChar(10)
+  lastLoginAt   DateTime? @map("last_login_at") @db.DateTime(3)
+  deletedAt     DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  roles            UserRole[]
+  sessions         Session[]
+  consents         UserConsent[]
+  staffAssignments CompanyStaff[]
+  ownedCompanies   Company[]          @relation("CompanyOwner")
+  drivers          Driver[]
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+  createdCommissions CommissionRule[] @relation("CommissionCreatedBy")
+
+  @@map("users")
+}
+
+model UserRole {
+  id         BigInt   @id @default(autoincrement())
+  publicId   String   @unique @db.Char(26)
+  userId     BigInt   @map("user_id")
+  role       String   @db.VarChar(32)
+  companyId  BigInt?  @map("company_id")
+  adminLevel String?  @map("admin_level") @db.VarChar(32)
+  status     String   @default("active") @db.VarChar(32)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  sessions Session[]
+
+  @@unique([userId, role, companyId])
+  @@index([companyId])
+  @@map("user_roles")
+}
+
+model OtpCode {
+  id        BigInt    @id @default(autoincrement())
+  publicId  String    @unique @db.Char(26)
+  phone     String    @db.VarChar(20)
+  codeHash  String    @map("code_hash") @db.VarChar(255)
+  purpose   String    @default("login") @db.VarChar(32)
+  expiresAt DateTime  @map("expires_at") @db.DateTime(3)
+  attempts  Int       @default(0) @db.TinyInt
+  usedAt    DateTime? @map("used_at") @db.DateTime(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@index([phone, purpose, expiresAt])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+model Session {
+  id               BigInt    @id @default(autoincrement())
+  publicId         String    @unique @db.Char(26)
+  userId           BigInt    @map("user_id")
+  userRoleId       BigInt    @map("user_role_id")
+  refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(255)
+  deviceInfo       Json?     @map("device_info")
+  ipAddress        String?   @map("ip_address") @db.VarChar(45)
+  expiresAt        DateTime  @map("expires_at") @db.DateTime(3)
+  revokedAt        DateTime? @map("revoked_at") @db.DateTime(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userRole UserRole  @relation(fields: [userRoleId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model UserConsent {
+  id         BigInt   @id @default(autoincrement())
+  publicId   String   @unique @db.Char(26)
+  userId     BigInt   @map("user_id")
+  document   String   @db.VarChar(100)
+  version    String   @db.VarChar(20)
+  acceptedAt DateTime @default(now()) @map("accepted_at") @db.DateTime(3)
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@map("user_consents")
+}
+
+// ── Companies ──────────────────────────────────────────────────────────────────
+
+model Company {
+  id                   BigInt    @id @default(autoincrement())
+  publicId             String    @unique @db.Char(26)
+  ownerUserId          BigInt    @map("owner_user_id")
+  type                 String    @default("company") @db.VarChar(20)
+  name                 String    @db.VarChar(200)
+  tradeName            String?   @map("trade_name") @db.VarChar(200)
+  registrationNumber   String?   @map("registration_number") @db.VarChar(100)
+  licenceNumber        String    @map("licence_number") @db.VarChar(100)
+  phone                String    @db.VarChar(20)
+  email                String?   @db.VarChar(320)
+  logoKey              String?   @map("logo_key") @db.VarChar(500)
+  status               String    @default("pending") @db.VarChar(32)
+  commissionOverrideBps Int?     @map("commission_override_bps") @db.Int
+  balanceLimitLaari    BigInt    @default(50000) @map("balance_limit_laari")
+  ratingAvg            Decimal?  @map("rating_avg") @db.Decimal(3, 2)
+  approvedBy           BigInt?   @map("approved_by")
+  approvedAt           DateTime? @map("approved_at") @db.DateTime(3)
+  isDemo               Boolean   @default(false) @map("is_demo")
+  deletedAt            DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  owner        User                    @relation("CompanyOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  roles        UserRole[]
+  documents    CompanyDocument[]
+  serviceAreas CompanyServiceArea[]
+  staff        CompanyStaff[]
+  vehicles     Vehicle[]
+  drivers      Driver[]
+  fares        Fare[]
+  surcharges   Surcharge[]
+  ledger       CompanyLedger[]
+  bookings     Booking[]
+  ratings      Rating[]
+  settlements  SettlementStatement[]
+  commissionRules CommissionRule[]
+
+  @@index([ownerUserId])
+  @@index([status])
+  @@map("companies")
+}
+
+model CompanyDocument {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @db.Char(26)
+  companyId   BigInt    @map("company_id")
+  type        String    @db.VarChar(32)
+  fileKey     String    @map("file_key") @db.VarChar(500)
+  expiryDate  DateTime? @map("expiry_date") @db.Date
+  status      String    @default("pending") @db.VarChar(32)
+  verifiedBy  BigInt?   @map("verified_by")
+  verifiedAt  DateTime? @map("verified_at") @db.DateTime(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([expiryDate])
+  @@map("company_documents")
+}
+
+model CompanyServiceArea {
+  companyId BigInt @map("company_id")
+  areaId    BigInt @map("area_id")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  area    Area    @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@id([companyId, areaId])
+  @@map("company_service_areas")
+}
+
+model CompanyStaff {
+  id        BigInt   @id @default(autoincrement())
+  publicId  String   @unique @db.Char(26)
+  companyId BigInt   @map("company_id")
+  userId    BigInt   @map("user_id")
+  staffRole String   @default("manager") @map("staff_role") @db.VarChar(32)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, userId])
+  @@map("company_staff")
+}
+
+// ── Fleet and drivers ──────────────────────────────────────────────────────────
+
+model VehicleType {
+  id              BigInt   @id @default(autoincrement())
+  publicId        String   @unique @db.Char(26)
+  name            String   @db.VarChar(100)
+  seats           Int      @db.TinyInt
+  luggageCapacity Int      @default(2) @map("luggage_capacity") @db.TinyInt
+  sortOrder       Int      @default(0) @map("sort_order") @db.SmallInt
+  isDemo          Boolean  @default(false) @map("is_demo")
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  vehicles       Vehicle[]
+  fares          Fare[]
+  suggestedFares SuggestedFare[]
+  bookings       Booking[]
+
+  @@map("vehicle_types")
+}
+
+model Vehicle {
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @db.Char(26)
+  companyId       BigInt    @map("company_id")
+  vehicleTypeId   BigInt    @map("vehicle_type_id")
+  plateNumber     String    @unique @map("plate_number") @db.VarChar(20)
+  make            String    @db.VarChar(100)
+  model           String    @db.VarChar(100)
+  year            Int       @db.SmallInt
+  colour          String    @db.VarChar(50)
+  insuranceExpiry DateTime  @map("insurance_expiry") @db.Date
+  status          String    @default("active") @db.VarChar(32)
+  isDemo          Boolean   @default(false) @map("is_demo")
+  deletedAt       DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicleType   VehicleType          @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
+  assignments   DriverVehicleAssignment[]
+  bookings      Booking[]
+  driverStatuses DriverStatus[]
+
+  @@index([companyId])
+  @@map("vehicles")
+}
+
+model Driver {
+  id             BigInt    @id @default(autoincrement())
+  publicId       String    @unique @db.Char(26)
+  userId         BigInt    @map("user_id")
+  companyId      BigInt    @map("company_id")
+  licenceNumber  String    @map("licence_number") @db.VarChar(100)
+  licenceExpiry  DateTime  @map("licence_expiry") @db.Date
+  idCardNumber   String?   @map("id_card_number") @db.VarChar(500)
+  photoKey       String?   @map("photo_key") @db.VarChar(500)
+  status         String    @default("pending") @db.VarChar(32)
+  ratingAvg      Decimal?  @map("rating_avg") @db.Decimal(3, 2)
+  isDemo         Boolean   @default(false) @map("is_demo")
+  deletedAt      DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  assignments DriverVehicleAssignment[]
+  driverStatus DriverStatus?
+  bookings    Booking[]
+  ratings     Rating[]
+  riderRatings RiderRating[]
+  offers      BookingOffer[]
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@map("drivers")
+}
+
+model DriverVehicleAssignment {
+  id           BigInt    @id @default(autoincrement())
+  publicId     String    @unique @db.Char(26)
+  driverId     BigInt    @map("driver_id")
+  vehicleId    BigInt    @map("vehicle_id")
+  assignedFrom DateTime  @default(now()) @map("assigned_from") @db.DateTime(3)
+  assignedTo   DateTime? @map("assigned_to") @db.DateTime(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  @@index([driverId])
+  @@index([vehicleId])
+  @@map("driver_vehicle_assignments")
+}
+
+model DriverStatus {
+  driverId         BigInt    @id @map("driver_id")
+  state            String    @default("offline") @db.VarChar(20)
+  currentVehicleId BigInt?   @map("current_vehicle_id")
+  lastLat          Decimal?  @map("last_lat") @db.Decimal(10, 7)
+  lastLng          Decimal?  @map("last_lng") @db.Decimal(10, 7)
+  lastSeenAt       DateTime? @map("last_seen_at") @db.DateTime(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  driver         Driver   @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  currentVehicle Vehicle? @relation(fields: [currentVehicleId], references: [id], onDelete: SetNull)
+
+  @@index([state])
+  @@map("driver_status")
+}
+
+// ── Areas and pricing ──────────────────────────────────────────────────────────
+
+model Area {
+  id        BigInt                     @id @default(autoincrement())
+  publicId  String                     @unique @db.Char(26)
+  nameEn    String                     @map("name_en") @db.VarChar(200)
+  nameDv    String                     @map("name_dv") @db.VarChar(200)
+  type      String                     @default("zone") @db.VarChar(50)
+  geometry  Unsupported("geometry")
+  active    Boolean                    @default(true)
+  isDemo    Boolean                    @default(false) @map("is_demo")
+  createdAt DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime                   @updatedAt @map("updated_at") @db.DateTime(3)
+
+  serviceAreas  CompanyServiceArea[]
+  fromFares     Fare[]               @relation("FareFromArea")
+  toFares       Fare[]               @relation("FareToArea")
+  suggestedFrom SuggestedFare[]      @relation("SuggestedFromArea")
+  suggestedTo   SuggestedFare[]      @relation("SuggestedToArea")
+  fromBookings  Booking[]            @relation("BookingFromArea")
+  toBookings    Booking[]            @relation("BookingToArea")
+
+  @@map("areas")
+}
+
+model SuggestedFare {
+  id            BigInt   @id @default(autoincrement())
+  publicId      String   @unique @db.Char(26)
+  fromAreaId    BigInt   @map("from_area_id")
+  toAreaId      BigInt   @map("to_area_id")
+  vehicleTypeId BigInt   @map("vehicle_type_id")
+  priceLaari    BigInt   @map("price_laari") @db.BigInt
+  createdBy     BigInt?  @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  fromArea    Area        @relation("SuggestedFromArea", fields: [fromAreaId], references: [id], onDelete: Restrict)
+  toArea      Area        @relation("SuggestedToArea", fields: [toAreaId], references: [id], onDelete: Restrict)
+  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([fromAreaId, toAreaId, vehicleTypeId])
+  @@map("suggested_fares")
+}
+
+model Fare {
+  id            BigInt    @id @default(autoincrement())
+  publicId      String    @unique @db.Char(26)
+  companyId     BigInt    @map("company_id")
+  vehicleTypeId BigInt    @map("vehicle_type_id")
+  fromAreaId    BigInt    @map("from_area_id")
+  toAreaId      BigInt    @map("to_area_id")
+  priceLaari    BigInt    @map("price_laari") @db.BigInt
+  active        Boolean   @default(true)
+  validFrom     DateTime? @map("valid_from") @db.DateTime(3)
+  validTo       DateTime? @map("valid_to") @db.DateTime(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
+  fromArea    Area        @relation("FareFromArea", fields: [fromAreaId], references: [id], onDelete: Restrict)
+  toArea      Area        @relation("FareToArea", fields: [toAreaId], references: [id], onDelete: Restrict)
+  history     FareHistory[]
+
+  @@unique([companyId, fromAreaId, toAreaId, vehicleTypeId])
+  @@index([fromAreaId, toAreaId, vehicleTypeId, active])
+  @@map("fares")
+}
+
+model Surcharge {
+  id          BigInt   @id @default(autoincrement())
+  publicId    String   @unique @db.Char(26)
+  companyId   BigInt   @map("company_id")
+  name        String   @db.VarChar(100)
+  amountLaari BigInt?  @map("amount_laari") @db.BigInt
+  percentBps  Int?     @map("percent_bps") @db.Int
+  timeFrom    DateTime?  @map("time_from") @db.Time(0)
+  timeTo      DateTime?  @map("time_to") @db.Time(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@map("surcharges")
+}
+
+model FareHistory {
+  id            BigInt   @id @default(autoincrement())
+  publicId      String   @unique @db.Char(26)
+  fareId        BigInt   @map("fare_id")
+  oldPriceLaari BigInt   @map("old_price_laari") @db.BigInt
+  newPriceLaari BigInt   @map("new_price_laari") @db.BigInt
+  changedBy     BigInt   @map("changed_by")
+  changedAt     DateTime @default(now()) @map("changed_at") @db.DateTime(3)
+
+  fare Fare @relation(fields: [fareId], references: [id], onDelete: Restrict)
+
+  @@index([fareId])
+  @@map("fare_history")
+}
+
+// ── Bookings ───────────────────────────────────────────────────────────────────
+
+model SavedPlace {
+  id        BigInt   @id @default(autoincrement())
+  publicId  String   @unique @db.Char(26)
+  userId    BigInt   @map("user_id")
+  label     String   @db.VarChar(100)
+  address   String?  @db.VarChar(500)
+  lat       Decimal  @db.Decimal(10, 7)
+  lng       Decimal  @db.Decimal(10, 7)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@index([userId])
+  @@map("saved_places")
+}
+
+model Booking {
+  id                BigInt    @id @default(autoincrement())
+  publicId          String    @unique @db.Char(26)
+  idempotencyKey    String    @unique @map("idempotency_key") @db.Char(36)
+  riderId           BigInt    @map("rider_id")
+  companyId         BigInt    @map("company_id")
+  driverId          BigInt?   @map("driver_id")
+  vehicleId         BigInt?   @map("vehicle_id")
+  vehicleTypeId     BigInt    @map("vehicle_type_id")
+  passengers        Int       @default(1) @db.TinyInt
+  luggageCount      Int       @default(0) @map("luggage_count") @db.TinyInt
+  pickupAddress     String?   @map("pickup_address") @db.VarChar(500)
+  pickupLat         Decimal   @map("pickup_lat") @db.Decimal(10, 7)
+  pickupLng         Decimal   @map("pickup_lng") @db.Decimal(10, 7)
+  dropoffAddress    String?   @map("dropoff_address") @db.VarChar(500)
+  dropoffLat        Decimal   @map("dropoff_lat") @db.Decimal(10, 7)
+  dropoffLng        Decimal   @map("dropoff_lng") @db.Decimal(10, 7)
+  fromAreaId        BigInt    @map("from_area_id")
+  toAreaId          BigInt    @map("to_area_id")
+  quotedPriceLaari  BigInt    @map("quoted_price_laari") @db.BigInt
+  finalPriceLaari   BigInt?   @map("final_price_laari") @db.BigInt
+  taxLaari          BigInt    @default(0) @map("tax_laari") @db.BigInt
+  commissionBps     Int?      @map("commission_bps") @db.Int
+  commissionLaari   BigInt?   @map("commission_laari") @db.BigInt
+  paymentMethod     String    @default("cash") @map("payment_method") @db.VarChar(20)
+  paymentStatus     String    @default("pending") @map("payment_status") @db.VarChar(20)
+  status            String    @default("requested") @db.VarChar(40)
+  requestedAt       DateTime  @default(now()) @map("requested_at") @db.DateTime(3)
+  acceptedAt        DateTime? @map("accepted_at") @db.DateTime(3)
+  arrivedAt         DateTime? @map("arrived_at") @db.DateTime(3)
+  startedAt         DateTime? @map("started_at") @db.DateTime(3)
+  completedAt       DateTime? @map("completed_at") @db.DateTime(3)
+  cancelledAt       DateTime? @map("cancelled_at") @db.DateTime(3)
+  cancelReason      String?   @map("cancel_reason") @db.VarChar(500)
+  cancelledBy       String?   @map("cancelled_by") @db.VarChar(32)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  driver      Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  vehicle     Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
+  fromArea    Area        @relation("BookingFromArea", fields: [fromAreaId], references: [id], onDelete: Restrict)
+  toArea      Area        @relation("BookingToArea", fields: [toAreaId], references: [id], onDelete: Restrict)
+
+  offers         BookingOffer[]
+  statusHistory  BookingStatusHistory[]
+  locations      BookingLocation[]
+  payments       Payment[]
+  ledgerEntries  CompanyLedger[]
+  settlementLines SettlementLine[]
+  refunds        Refund[]
+  rating         Rating?
+  riderRating    RiderRating?
+  complaint      Complaint[]
+
+  @@index([riderId])
+  @@index([companyId, status])
+  @@index([driverId])
+  @@index([status])
+  @@index([requestedAt])
+  @@map("bookings")
+}
+
+model BookingOffer {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @db.Char(26)
+  bookingId   BigInt    @map("booking_id")
+  driverId    BigInt    @map("driver_id")
+  sentAt      DateTime  @default(now()) @map("sent_at") @db.DateTime(3)
+  response    String?   @db.VarChar(20)
+  respondedAt DateTime? @map("responded_at") @db.DateTime(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, driverId])
+  @@index([driverId])
+  @@map("booking_offers")
+}
+
+model BookingStatusHistory {
+  id         BigInt   @id @default(autoincrement())
+  publicId   String   @unique @db.Char(26)
+  bookingId  BigInt   @map("booking_id")
+  fromStatus String?  @map("from_status") @db.VarChar(40)
+  toStatus   String   @map("to_status") @db.VarChar(40)
+  changedBy  BigInt?  @map("changed_by")
+  note       String?  @db.VarChar(500)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_status_history")
+}
+
+model BookingLocation {
+  id         BigInt   @id @default(autoincrement())
+  bookingId  BigInt   @map("booking_id")
+  lat        Decimal  @db.Decimal(10, 7)
+  lng        Decimal  @db.Decimal(10, 7)
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.DateTime(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_locations")
+}
+
+// ── Money ──────────────────────────────────────────────────────────────────────
+
+model CommissionRule {
+  id           BigInt    @id @default(autoincrement())
+  publicId     String    @unique @db.Char(26)
+  scope        String    @default("global") @db.VarChar(20)
+  companyId    BigInt?   @map("company_id")
+  percentBps   Int       @map("percent_bps") @db.Int
+  fixedFeeLaari BigInt   @default(0) @map("fixed_fee_laari") @db.BigInt
+  validFrom    DateTime  @default(now()) @map("valid_from") @db.DateTime(3)
+  validTo      DateTime? @map("valid_to") @db.DateTime(3)
+  createdBy    BigInt    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdByUser User  @relation("CommissionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([scope, validFrom, validTo])
+  @@index([companyId])
+  @@map("commission_rules")
+}
+
+model Payment {
+  id                BigInt    @id @default(autoincrement())
+  publicId          String    @unique @db.Char(26)
+  bookingId         BigInt    @map("booking_id")
+  method            String    @default("cash") @db.VarChar(20)
+  amountLaari       BigInt    @map("amount_laari") @db.BigInt
+  status            String    @default("pending") @db.VarChar(20)
+  providerReference String?   @map("provider_reference") @db.VarChar(255)
+  paidAt            DateTime? @map("paid_at") @db.DateTime(3)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@map("payments")
+}
+
+model CompanyLedger {
+  id              BigInt   @id @default(autoincrement())
+  publicId        String   @unique @db.Char(26)
+  companyId       BigInt   @map("company_id")
+  type            String   @db.VarChar(32)
+  amountLaari     BigInt   @map("amount_laari") @db.BigInt
+  balanceAfterLaari BigInt @map("balance_after_laari") @db.BigInt
+  bookingId       BigInt?  @map("booking_id")
+  note            String?  @db.VarChar(500)
+  createdBy       BigInt?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([bookingId])
+  @@map("company_ledger")
+}
+
+model SettlementStatement {
+  id             BigInt    @id @default(autoincrement())
+  publicId       String    @unique @db.Char(26)
+  companyId      BigInt    @map("company_id")
+  periodStart    DateTime  @map("period_start") @db.Date
+  periodEnd      DateTime  @map("period_end") @db.Date
+  totalRides     Int       @default(0) @map("total_rides") @db.Int
+  grossLaari     BigInt    @default(0) @map("gross_laari") @db.BigInt
+  commissionLaari BigInt   @default(0) @map("commission_laari") @db.BigInt
+  netLaari       BigInt    @default(0) @map("net_laari") @db.BigInt
+  status         String    @default("open") @db.VarChar(20)
+  issuedAt       DateTime? @map("issued_at") @db.DateTime(3)
+  paidAt         DateTime? @map("paid_at") @db.DateTime(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  company Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  lines   SettlementLine[]
+
+  @@unique([companyId, periodStart, periodEnd])
+  @@index([companyId, periodStart])
+  @@map("settlement_statements")
+}
+
+model SettlementLine {
+  id             BigInt   @id @default(autoincrement())
+  publicId       String   @unique @db.Char(26)
+  statementId    BigInt   @map("statement_id")
+  bookingId      BigInt   @unique @map("booking_id")
+  fareLaari      BigInt   @map("fare_laari") @db.BigInt
+  commissionLaari BigInt  @map("commission_laari") @db.BigInt
+
+  statement SettlementStatement @relation(fields: [statementId], references: [id], onDelete: Restrict)
+  booking   Booking             @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([statementId])
+  @@map("settlement_lines")
+}
+
+model Refund {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @db.Char(26)
+  bookingId   BigInt    @map("booking_id")
+  amountLaari BigInt    @map("amount_laari") @db.BigInt
+  reason      String    @db.VarChar(500)
+  approvedBy  BigInt?   @map("approved_by")
+  status      String    @default("pending") @db.VarChar(20)
+  createdBy   BigInt?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@map("refunds")
+}
+
+// ── Trust, support and system ──────────────────────────────────────────────────
+
+model Rating {
+  id            BigInt   @id @default(autoincrement())
+  publicId      String   @unique @db.Char(26)
+  bookingId     BigInt   @unique @map("booking_id")
+  riderId       BigInt   @map("rider_id")
+  driverId      BigInt   @map("driver_id")
+  companyId     BigInt   @map("company_id")
+  driverScore   Int      @map("driver_score") @db.TinyInt
+  companyScore  Int      @map("company_score") @db.TinyInt
+  comment       String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([driverId])
+  @@index([companyId])
+  @@map("ratings")
+}
+
+model RiderRating {
+  id        BigInt   @id @default(autoincrement())
+  publicId  String   @unique @db.Char(26)
+  bookingId BigInt   @unique @map("booking_id")
+  driverId  BigInt   @map("driver_id")
+  riderId   BigInt   @map("rider_id")
+  score     Int      @db.TinyInt
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  @@index([riderId])
+  @@map("rider_ratings")
+}
+
+model Complaint {
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @db.Char(26)
+  bookingId   BigInt?   @map("booking_id")
+  raisedBy    BigInt    @map("raised_by")
+  againstType String    @map("against_type") @db.VarChar(20)
+  category    String    @db.VarChar(100)
+  description String    @db.Text
+  status      String    @default("open") @db.VarChar(20)
+  resolution  String?   @db.Text
+  resolvedBy  BigInt?   @map("resolved_by")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  resolvedAt  DateTime? @map("resolved_at") @db.DateTime(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([raisedBy])
+  @@index([status])
+  @@map("complaints")
+}
+
+model Notification {
+  id        BigInt    @id @default(autoincrement())
+  publicId  String    @unique @db.Char(26)
+  userId    BigInt    @map("user_id")
+  channel   String    @default("in_app") @db.VarChar(20)
+  title     String    @db.VarChar(200)
+  body      String    @db.Text
+  data      Json?
+  readAt    DateTime? @map("read_at") @db.DateTime(3)
+  sentAt    DateTime  @default(now()) @map("sent_at") @db.DateTime(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  publicId    String   @unique @db.Char(26)
+  actorUserId BigInt?  @map("actor_user_id")
+  action      String   @db.VarChar(100)
+  entityType  String   @map("entity_type") @db.VarChar(100)
+  entityId    String?  @map("entity_id") @db.VarChar(50)
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  requestId   String?  @map("request_id") @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model PlatformSetting {
+  settingKey String   @id @map("setting_key") @db.VarChar(100)
+  value      Json
+  description String? @db.VarChar(500)
+  updatedBy  BigInt?  @map("updated_by")
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@map("platform_settings")
+}
