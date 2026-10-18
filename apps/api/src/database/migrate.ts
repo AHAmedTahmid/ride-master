@@ -26,7 +26,7 @@ if (!DB_URL) {
   process.exit(1)
 }
 
-function parseMysqlUrl(url: string) {
+export function parseMysqlUrl(url: string) {
   const u = new URL(url)
   return {
     host: u.hostname,
@@ -100,7 +100,7 @@ export function splitSqlStatements(sql: string): string[] {
   return statements
 }
 
-async function run() {
+export async function run() {
   const config = parseMysqlUrl(DB_URL)
   const connection = await mysql.createConnection(config)
 
@@ -181,7 +181,10 @@ async function run() {
   console.info(`[migrate] Done. ${ran} migration(s) applied.`)
 }
 
-run().catch((err) => {
-  console.error('[migrate] Unexpected error:', err)
-  process.exit(1)
-})
+// Imported by reset.ts (and tests): only self-execute when run directly.
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('[migrate] Unexpected error:', err)
+    process.exit(1)
+  })
+}
