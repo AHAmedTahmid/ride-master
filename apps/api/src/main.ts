@@ -1,9 +1,12 @@
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe, Logger, VersioningType } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import helmet from 'helmet'
 import compression from 'compression'
+import cookieParser from 'cookie-parser'
 import { AppModule } from './app.module'
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter'
+import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor'
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap')
@@ -14,8 +17,11 @@ async function bootstrap() {
   // ── Security ────────────────────────────────────────────────────────────────
   app.use(helmet())
   app.use(compression())
+  app.use(cookieParser())
 
   // ── Global prefix ───────────────────────────────────────────────────────────
+  // The URL carries the API version (/api/v1); Nest URI versioning would
+  // duplicate it, so routes are versioned by prefix alone.
   app.setGlobalPrefix('api/v1')
 
   // ── CORS ────────────────────────────────────────────────────────────────────
@@ -27,15 +33,9 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-Idempotency-Key'],
   })
 
-  // ── Validation ──────────────────────────────────────────────────────────────
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  )
+  // ── Cross-cutting: request ids + one error envelope ─────────────────────────
+  app.useGlobalInterceptors(new RequestIdInterceptor())
+  app.useGlobalFilters(new AllExceptionsFilter())
 
   // ── Swagger / OpenAPI ───────────────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'production') {
@@ -44,14 +44,12 @@ async function bootstrap() {
       .setDescription('Taxi marketplace API for the Maldives')
       .setVersion('1.0')
       .addBearerAuth()
+      .addCookieAuth('rm_refresh')
       .addTag('auth', 'Authentication and sessions')
-      .addTag('companies', 'Company management')
-      .addTag('drivers', 'Driver management')
-      .addTag('vehicles', 'Vehicle management')
-      .addTag('areas', 'Area and zone management')
-      .addTag('fares', 'Fare and surcharge management')
-      .addTag('bookings', 'Booking lifecycle')
+      .addTag('me', 'Current user profile and role switching')
+      .addTag('settings', 'Platform tunables')
       .addTag('admin', 'SuperAdmin operations')
+      .addTag('health', 'Liveness and readiness')
       .build()
     const document = SwaggerModule.createDocument(app, config)
     SwaggerModule.setup('api/docs', app, document)

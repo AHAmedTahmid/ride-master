@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler'
 import { ScheduleModule } from '@nestjs/schedule'
 import { DatabaseModule } from './database/database.module'
 import { RedisModule } from './redis/redis.module'
+import { PolicyModule } from './common/policy/policy.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { UsersModule } from './modules/users/users.module'
 import { AuditModule } from './modules/audit/audit.module'
@@ -25,6 +26,7 @@ import { HealthModule } from './modules/health/health.module'
     // ── Rate limiting ──────────────────────────────────────────────────────────
     ThrottlerModule.forRoot([
       {
+        name: 'default',
         ttl: parseInt(process.env.RATE_LIMIT_TTL_MS ?? '60000', 10),
         limit: parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
       },
@@ -36,6 +38,7 @@ import { HealthModule } from './modules/health/health.module'
     // ── Infrastructure ─────────────────────────────────────────────────────────
     DatabaseModule,
     RedisModule,
+    PolicyModule,
 
     // ── Providers ──────────────────────────────────────────────────────────────
     SmsModule,
