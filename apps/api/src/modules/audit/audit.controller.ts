@@ -28,6 +28,7 @@ export class AuditController {
       this.prisma.auditLog.count({ where }),
       this.prisma.auditLog.findMany({
         where,
+        include: { actor: { select: { publicId: true, fullName: true } } },
         orderBy: { id: 'desc' },
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
@@ -36,7 +37,8 @@ export class AuditController {
     return {
       data: rows.map((r) => ({
         publicId: r.publicId,
-        actorUserId: r.actorUserId?.toString() ?? null,
+        actorPublicId: r.actor?.publicId ?? null,
+        actorName: r.actor?.fullName ?? null,
         action: r.action,
         entityType: r.entityType,
         entityId: r.entityId,
