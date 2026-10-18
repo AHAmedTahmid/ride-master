@@ -5,7 +5,7 @@ export const MVR_TO_LAARI = 100 as const
 export const MALDIVES_COUNTRY_CODE = '+960' as const
 
 /** Phone regex: +960 followed by exactly 7 digits */
-export const PHONE_REGEX = /^\+960\d{7}$/ as const
+export const PHONE_REGEX = /^\+960\d{7}$/
 
 /** OTP code length */
 export const OTP_LENGTH = 6 as const

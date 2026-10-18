@@ -1,8 +1,7 @@
 import { Module, Global } from '@nestjs/common'
 import { RedisService } from './redis.service'
+import { REDIS_CLIENT } from './redis.constants'
 import Redis from 'ioredis'
-
-const REDIS_CLIENT = 'REDIS_CLIENT'
 
 @Global()
 @Module({
@@ -14,8 +13,7 @@ const REDIS_CLIENT = 'REDIS_CLIENT'
         const client = new Redis(url, {
           maxRetriesPerRequest: 3,
           retryStrategy(times: number) {
-            const delay = Math.min(times * 200, 5000)
-            return delay
+            return Math.min(times * 200, 5000)
           },
           lazyConnect: false,
         })
@@ -33,5 +31,3 @@ const REDIS_CLIENT = 'REDIS_CLIENT'
   exports: [REDIS_CLIENT, RedisService],
 })
 export class RedisModule {}
-
-export { REDIS_CLIENT }

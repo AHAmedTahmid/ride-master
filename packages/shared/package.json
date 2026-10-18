@@ -2,13 +2,13 @@
   "name": "@ride-master/shared",
   "version": "0.1.0",
   "private": true,
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
+    "build": "tsc --project tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts",
-    "test": "vitest run",
-    "build": "tsc --project tsconfig.json"
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "dependencies": {
     "zod": "^3.23.8"
