@@ -17,8 +17,8 @@ datasource db {
 
 model User {
   id            BigInt    @id @default(autoincrement())
-  publicId      String    @unique @db.Char(26)
-  fullName      String    @db.VarChar(200)
+  publicId      String    @unique @map("public_id") @db.Char(26)
+  fullName      String    @map("full_name") @db.VarChar(200)
   phone         String    @unique @db.VarChar(20)
   email         String?   @unique @db.VarChar(320)
   passwordHash  String?   @map("password_hash") @db.VarChar(255)
@@ -30,22 +30,22 @@ model User {
   createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  roles            UserRole[]
-  sessions         Session[]
-  consents         UserConsent[]
-  staffAssignments CompanyStaff[]
-  ownedCompanies   Company[]          @relation("CompanyOwner")
-  drivers          Driver[]
-  auditLogs        AuditLog[]
-  notifications    Notification[]
-  createdCommissions CommissionRule[] @relation("CommissionCreatedBy")
+  roles             UserRole[]
+  sessions          Session[]
+  consents          UserConsent[]
+  staffAssignments  CompanyStaff[]
+  ownedCompanies    Company[]           @relation("CompanyOwner")
+  drivers           Driver[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  createdCommissions CommissionRule[]   @relation("CommissionCreatedBy")
 
   @@map("users")
 }
 
 model UserRole {
   id         BigInt   @id @default(autoincrement())
-  publicId   String   @unique @db.Char(26)
+  publicId   String   @unique @map("public_id") @db.Char(26)
   userId     BigInt   @map("user_id")
   role       String   @db.VarChar(32)
   companyId  BigInt?  @map("company_id")
@@ -54,8 +54,8 @@ model UserRole {
   createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  company Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  company  Company?  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   sessions Session[]
 
   @@unique([userId, role, companyId])
@@ -65,7 +65,7 @@ model UserRole {
 
 model OtpCode {
   id        BigInt    @id @default(autoincrement())
-  publicId  String    @unique @db.Char(26)
+  publicId  String    @unique @map("public_id") @db.Char(26)
   phone     String    @db.VarChar(20)
   codeHash  String    @map("code_hash") @db.VarChar(255)
   purpose   String    @default("login") @db.VarChar(32)
@@ -81,7 +81,7 @@ model OtpCode {
 
 model Session {
   id               BigInt    @id @default(autoincrement())
-  publicId         String    @unique @db.Char(26)
+  publicId         String    @unique @map("public_id") @db.Char(26)
   userId           BigInt    @map("user_id")
   userRoleId       BigInt    @map("user_role_id")
   refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(255)
@@ -102,7 +102,7 @@ model Session {
 
 model UserConsent {
   id         BigInt   @id @default(autoincrement())
-  publicId   String   @unique @db.Char(26)
+  publicId   String   @unique @map("public_id") @db.Char(26)
   userId     BigInt   @map("user_id")
   document   String   @db.VarChar(100)
   version    String   @db.VarChar(20)
@@ -118,41 +118,41 @@ model UserConsent {
 // ── Companies ──────────────────────────────────────────────────────────────────
 
 model Company {
-  id                   BigInt    @id @default(autoincrement())
-  publicId             String    @unique @db.Char(26)
-  ownerUserId          BigInt    @map("owner_user_id")
-  type                 String    @default("company") @db.VarChar(20)
-  name                 String    @db.VarChar(200)
-  tradeName            String?   @map("trade_name") @db.VarChar(200)
-  registrationNumber   String?   @map("registration_number") @db.VarChar(100)
-  licenceNumber        String    @map("licence_number") @db.VarChar(100)
-  phone                String    @db.VarChar(20)
-  email                String?   @db.VarChar(320)
-  logoKey              String?   @map("logo_key") @db.VarChar(500)
-  status               String    @default("pending") @db.VarChar(32)
-  commissionOverrideBps Int?     @map("commission_override_bps") @db.Int
-  balanceLimitLaari    BigInt    @default(50000) @map("balance_limit_laari")
-  ratingAvg            Decimal?  @map("rating_avg") @db.Decimal(3, 2)
-  approvedBy           BigInt?   @map("approved_by")
-  approvedAt           DateTime? @map("approved_at") @db.DateTime(3)
-  isDemo               Boolean   @default(false) @map("is_demo")
-  deletedAt            DateTime? @map("deleted_at") @db.DateTime(3)
-  createdAt            DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt            DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  id                    BigInt    @id @default(autoincrement())
+  publicId              String    @unique @map("public_id") @db.Char(26)
+  ownerUserId           BigInt    @map("owner_user_id")
+  type                  String    @default("company") @db.VarChar(20)
+  name                  String    @db.VarChar(200)
+  tradeName             String?   @map("trade_name") @db.VarChar(200)
+  registrationNumber    String?   @map("registration_number") @db.VarChar(100)
+  licenceNumber         String    @map("licence_number") @db.VarChar(100)
+  phone                 String    @db.VarChar(20)
+  email                 String?   @db.VarChar(320)
+  logoKey               String?   @map("logo_key") @db.VarChar(500)
+  status                String    @default("pending") @db.VarChar(32)
+  commissionOverrideBps Int?      @map("commission_override_bps") @db.Int
+  balanceLimitLaari     BigInt    @default(50000) @map("balance_limit_laari")
+  ratingAvg             Decimal?  @map("rating_avg") @db.Decimal(3, 2)
+  approvedBy            BigInt?   @map("approved_by")
+  approvedAt            DateTime? @map("approved_at") @db.DateTime(3)
+  isDemo                Boolean   @default(false) @map("is_demo")
+  deletedAt             DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  owner        User                    @relation("CompanyOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  roles        UserRole[]
-  documents    CompanyDocument[]
-  serviceAreas CompanyServiceArea[]
-  staff        CompanyStaff[]
-  vehicles     Vehicle[]
-  drivers      Driver[]
-  fares        Fare[]
-  surcharges   Surcharge[]
-  ledger       CompanyLedger[]
-  bookings     Booking[]
-  ratings      Rating[]
-  settlements  SettlementStatement[]
+  owner          User                  @relation("CompanyOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  roles          UserRole[]
+  documents      CompanyDocument[]
+  serviceAreas   CompanyServiceArea[]
+  staff          CompanyStaff[]
+  vehicles       Vehicle[]
+  drivers        Driver[]
+  fares          Fare[]
+  surcharges     Surcharge[]
+  ledger         CompanyLedger[]
+  bookings       Booking[]
+  ratings        Rating[]
+  settlements    SettlementStatement[]
   commissionRules CommissionRule[]
 
   @@index([ownerUserId])
@@ -161,17 +161,17 @@ model Company {
 }
 
 model CompanyDocument {
-  id          BigInt    @id @default(autoincrement())
-  publicId    String    @unique @db.Char(26)
-  companyId   BigInt    @map("company_id")
-  type        String    @db.VarChar(32)
-  fileKey     String    @map("file_key") @db.VarChar(500)
-  expiryDate  DateTime? @map("expiry_date") @db.Date
-  status      String    @default("pending") @db.VarChar(32)
-  verifiedBy  BigInt?   @map("verified_by")
-  verifiedAt  DateTime? @map("verified_at") @db.DateTime(3)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  id         BigInt    @id @default(autoincrement())
+  publicId   String    @unique @map("public_id") @db.Char(26)
+  companyId  BigInt    @map("company_id")
+  type       String    @db.VarChar(32)
+  fileKey    String    @map("file_key") @db.VarChar(500)
+  expiryDate DateTime? @map("expiry_date") @db.Date
+  status     String    @default("pending") @db.VarChar(32)
+  verifiedBy BigInt?   @map("verified_by")
+  verifiedAt DateTime? @map("verified_at") @db.DateTime(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -193,7 +193,7 @@ model CompanyServiceArea {
 
 model CompanyStaff {
   id        BigInt   @id @default(autoincrement())
-  publicId  String   @unique @db.Char(26)
+  publicId  String   @unique @map("public_id") @db.Char(26)
   companyId BigInt   @map("company_id")
   userId    BigInt   @map("user_id")
   staffRole String   @default("manager") @map("staff_role") @db.VarChar(32)
@@ -210,7 +210,7 @@ model CompanyStaff {
 
 model VehicleType {
   id              BigInt   @id @default(autoincrement())
-  publicId        String   @unique @db.Char(26)
+  publicId        String   @unique @map("public_id") @db.Char(26)
   name            String   @db.VarChar(100)
   seats           Int      @db.TinyInt
   luggageCapacity Int      @default(2) @map("luggage_capacity") @db.TinyInt
@@ -229,7 +229,7 @@ model VehicleType {
 
 model Vehicle {
   id              BigInt    @id @default(autoincrement())
-  publicId        String    @unique @db.Char(26)
+  publicId        String    @unique @map("public_id") @db.Char(26)
   companyId       BigInt    @map("company_id")
   vehicleTypeId   BigInt    @map("vehicle_type_id")
   plateNumber     String    @unique @map("plate_number") @db.VarChar(20)
@@ -244,10 +244,10 @@ model Vehicle {
   createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  company       Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  vehicleType   VehicleType          @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
-  assignments   DriverVehicleAssignment[]
-  bookings      Booking[]
+  company        Company                     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicleType    VehicleType                 @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict)
+  assignments    DriverVehicleAssignment[]
+  bookings       Booking[]
   driverStatuses DriverStatus[]
 
   @@index([companyId])
@@ -255,29 +255,29 @@ model Vehicle {
 }
 
 model Driver {
-  id             BigInt    @id @default(autoincrement())
-  publicId       String    @unique @db.Char(26)
-  userId         BigInt    @map("user_id")
-  companyId      BigInt    @map("company_id")
-  licenceNumber  String    @map("licence_number") @db.VarChar(100)
-  licenceExpiry  DateTime  @map("licence_expiry") @db.Date
-  idCardNumber   String?   @map("id_card_number") @db.VarChar(500)
-  photoKey       String?   @map("photo_key") @db.VarChar(500)
-  status         String    @default("pending") @db.VarChar(32)
-  ratingAvg      Decimal?  @map("rating_avg") @db.Decimal(3, 2)
-  isDemo         Boolean   @default(false) @map("is_demo")
-  deletedAt      DateTime? @map("deleted_at") @db.DateTime(3)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  id            BigInt    @id @default(autoincrement())
+  publicId      String    @unique @map("public_id") @db.Char(26)
+  userId        BigInt    @map("user_id")
+  companyId     BigInt    @map("company_id")
+  licenceNumber String    @map("licence_number") @db.VarChar(100)
+  licenceExpiry DateTime  @map("licence_expiry") @db.Date
+  idCardNumber  String?   @map("id_card_number") @db.VarChar(500)
+  photoKey      String?   @map("photo_key") @db.VarChar(500)
+  status        String    @default("pending") @db.VarChar(32)
+  ratingAvg     Decimal?  @map("rating_avg") @db.Decimal(3, 2)
+  isDemo        Boolean   @default(false) @map("is_demo")
+  deletedAt     DateTime? @map("deleted_at") @db.DateTime(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  assignments DriverVehicleAssignment[]
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  assignments  DriverVehicleAssignment[]
   driverStatus DriverStatus?
-  bookings    Booking[]
-  ratings     Rating[]
+  bookings     Booking[]
+  ratings      Rating[]
   riderRatings RiderRating[]
-  offers      BookingOffer[]
+  offers       BookingOffer[]
 
   @@index([userId])
   @@index([companyId])
@@ -287,7 +287,7 @@ model Driver {
 
 model DriverVehicleAssignment {
   id           BigInt    @id @default(autoincrement())
-  publicId     String    @unique @db.Char(26)
+  publicId     String    @unique @map("public_id") @db.Char(26)
   driverId     BigInt    @map("driver_id")
   vehicleId    BigInt    @map("vehicle_id")
   assignedFrom DateTime  @default(now()) @map("assigned_from") @db.DateTime(3)
@@ -321,35 +321,35 @@ model DriverStatus {
 // ── Areas and pricing ──────────────────────────────────────────────────────────
 
 model Area {
-  id        BigInt                     @id @default(autoincrement())
-  publicId  String                     @unique @db.Char(26)
-  nameEn    String                     @map("name_en") @db.VarChar(200)
-  nameDv    String                     @map("name_dv") @db.VarChar(200)
-  type      String                     @default("zone") @db.VarChar(50)
+  id        BigInt                @id @default(autoincrement())
+  publicId  String                @unique @map("public_id") @db.Char(26)
+  nameEn    String                @map("name_en") @db.VarChar(200)
+  nameDv    String                @map("name_dv") @db.VarChar(200)
+  type      String                @default("zone") @db.VarChar(50)
   geometry  Unsupported("geometry")
-  active    Boolean                    @default(true)
-  isDemo    Boolean                    @default(false) @map("is_demo")
-  createdAt DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt DateTime                   @updatedAt @map("updated_at") @db.DateTime(3)
+  active    Boolean               @default(true)
+  isDemo    Boolean               @default(false) @map("is_demo")
+  createdAt DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime              @updatedAt @map("updated_at") @db.DateTime(3)
 
   serviceAreas  CompanyServiceArea[]
-  fromFares     Fare[]               @relation("FareFromArea")
-  toFares       Fare[]               @relation("FareToArea")
-  suggestedFrom SuggestedFare[]      @relation("SuggestedFromArea")
-  suggestedTo   SuggestedFare[]      @relation("SuggestedToArea")
-  fromBookings  Booking[]            @relation("BookingFromArea")
-  toBookings    Booking[]            @relation("BookingToArea")
+  fromFares     Fare[]              @relation("FareFromArea")
+  toFares       Fare[]              @relation("FareToArea")
+  suggestedFrom SuggestedFare[]     @relation("SuggestedFromArea")
+  suggestedTo   SuggestedFare[]     @relation("SuggestedToArea")
+  fromBookings  Booking[]           @relation("BookingFromArea")
+  toBookings    Booking[]           @relation("BookingToArea")
 
   @@map("areas")
 }
 
 model SuggestedFare {
   id            BigInt   @id @default(autoincrement())
-  publicId      String   @unique @db.Char(26)
+  publicId      String   @unique @map("public_id") @db.Char(26)
   fromAreaId    BigInt   @map("from_area_id")
   toAreaId      BigInt   @map("to_area_id")
   vehicleTypeId BigInt   @map("vehicle_type_id")
-  priceLaari    BigInt   @map("price_laari") @db.BigInt
+  priceLaari    BigInt   @map("price_laari")
   createdBy     BigInt?  @map("created_by")
   createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(3)
@@ -364,12 +364,12 @@ model SuggestedFare {
 
 model Fare {
   id            BigInt    @id @default(autoincrement())
-  publicId      String    @unique @db.Char(26)
+  publicId      String    @unique @map("public_id") @db.Char(26)
   companyId     BigInt    @map("company_id")
   vehicleTypeId BigInt    @map("vehicle_type_id")
   fromAreaId    BigInt    @map("from_area_id")
   toAreaId      BigInt    @map("to_area_id")
-  priceLaari    BigInt    @map("price_laari") @db.BigInt
+  priceLaari    BigInt    @map("price_laari")
   active        Boolean   @default(true)
   validFrom     DateTime? @map("valid_from") @db.DateTime(3)
   validTo       DateTime? @map("valid_to") @db.DateTime(3)
@@ -388,17 +388,17 @@ model Fare {
 }
 
 model Surcharge {
-  id          BigInt   @id @default(autoincrement())
-  publicId    String   @unique @db.Char(26)
-  companyId   BigInt   @map("company_id")
-  name        String   @db.VarChar(100)
-  amountLaari BigInt?  @map("amount_laari") @db.BigInt
-  percentBps  Int?     @map("percent_bps") @db.Int
-  timeFrom    DateTime?  @map("time_from") @db.Time(0)
-  timeTo      DateTime?  @map("time_to") @db.Time(0)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  id          BigInt    @id @default(autoincrement())
+  publicId    String    @unique @map("public_id") @db.Char(26)
+  companyId   BigInt    @map("company_id")
+  name        String    @db.VarChar(100)
+  amountLaari BigInt?   @map("amount_laari")
+  percentBps  Int?      @map("percent_bps")
+  timeFrom    DateTime? @map("time_from") @db.Time(0)
+  timeTo      DateTime? @map("time_to") @db.Time(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -408,10 +408,10 @@ model Surcharge {
 
 model FareHistory {
   id            BigInt   @id @default(autoincrement())
-  publicId      String   @unique @db.Char(26)
+  publicId      String   @unique @map("public_id") @db.Char(26)
   fareId        BigInt   @map("fare_id")
-  oldPriceLaari BigInt   @map("old_price_laari") @db.BigInt
-  newPriceLaari BigInt   @map("new_price_laari") @db.BigInt
+  oldPriceLaari BigInt   @map("old_price_laari")
+  newPriceLaari BigInt   @map("new_price_laari")
   changedBy     BigInt   @map("changed_by")
   changedAt     DateTime @default(now()) @map("changed_at") @db.DateTime(3)
 
@@ -425,7 +425,7 @@ model FareHistory {
 
 model SavedPlace {
   id        BigInt   @id @default(autoincrement())
-  publicId  String   @unique @db.Char(26)
+  publicId  String   @unique @map("public_id") @db.Char(26)
   userId    BigInt   @map("user_id")
   label     String   @db.VarChar(100)
   address   String?  @db.VarChar(500)
@@ -439,42 +439,42 @@ model SavedPlace {
 }
 
 model Booking {
-  id                BigInt    @id @default(autoincrement())
-  publicId          String    @unique @db.Char(26)
-  idempotencyKey    String    @unique @map("idempotency_key") @db.Char(36)
-  riderId           BigInt    @map("rider_id")
-  companyId         BigInt    @map("company_id")
-  driverId          BigInt?   @map("driver_id")
-  vehicleId         BigInt?   @map("vehicle_id")
-  vehicleTypeId     BigInt    @map("vehicle_type_id")
-  passengers        Int       @default(1) @db.TinyInt
-  luggageCount      Int       @default(0) @map("luggage_count") @db.TinyInt
-  pickupAddress     String?   @map("pickup_address") @db.VarChar(500)
-  pickupLat         Decimal   @map("pickup_lat") @db.Decimal(10, 7)
-  pickupLng         Decimal   @map("pickup_lng") @db.Decimal(10, 7)
-  dropoffAddress    String?   @map("dropoff_address") @db.VarChar(500)
-  dropoffLat        Decimal   @map("dropoff_lat") @db.Decimal(10, 7)
-  dropoffLng        Decimal   @map("dropoff_lng") @db.Decimal(10, 7)
-  fromAreaId        BigInt    @map("from_area_id")
-  toAreaId          BigInt    @map("to_area_id")
-  quotedPriceLaari  BigInt    @map("quoted_price_laari") @db.BigInt
-  finalPriceLaari   BigInt?   @map("final_price_laari") @db.BigInt
-  taxLaari          BigInt    @default(0) @map("tax_laari") @db.BigInt
-  commissionBps     Int?      @map("commission_bps") @db.Int
-  commissionLaari   BigInt?   @map("commission_laari") @db.BigInt
-  paymentMethod     String    @default("cash") @map("payment_method") @db.VarChar(20)
-  paymentStatus     String    @default("pending") @map("payment_status") @db.VarChar(20)
-  status            String    @default("requested") @db.VarChar(40)
-  requestedAt       DateTime  @default(now()) @map("requested_at") @db.DateTime(3)
-  acceptedAt        DateTime? @map("accepted_at") @db.DateTime(3)
-  arrivedAt         DateTime? @map("arrived_at") @db.DateTime(3)
-  startedAt         DateTime? @map("started_at") @db.DateTime(3)
-  completedAt       DateTime? @map("completed_at") @db.DateTime(3)
-  cancelledAt       DateTime? @map("cancelled_at") @db.DateTime(3)
-  cancelReason      String?   @map("cancel_reason") @db.VarChar(500)
-  cancelledBy       String?   @map("cancelled_by") @db.VarChar(32)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  id               BigInt    @id @default(autoincrement())
+  publicId         String    @unique @map("public_id") @db.Char(26)
+  idempotencyKey   String    @unique @map("idempotency_key") @db.Char(36)
+  riderId          BigInt    @map("rider_id")
+  companyId        BigInt    @map("company_id")
+  driverId         BigInt?   @map("driver_id")
+  vehicleId        BigInt?   @map("vehicle_id")
+  vehicleTypeId    BigInt    @map("vehicle_type_id")
+  passengers       Int       @default(1) @db.TinyInt
+  luggageCount     Int       @default(0) @map("luggage_count") @db.TinyInt
+  pickupAddress    String?   @map("pickup_address") @db.VarChar(500)
+  pickupLat        Decimal   @map("pickup_lat") @db.Decimal(10, 7)
+  pickupLng        Decimal   @map("pickup_lng") @db.Decimal(10, 7)
+  dropoffAddress   String?   @map("dropoff_address") @db.VarChar(500)
+  dropoffLat       Decimal   @map("dropoff_lat") @db.Decimal(10, 7)
+  dropoffLng       Decimal   @map("dropoff_lng") @db.Decimal(10, 7)
+  fromAreaId       BigInt    @map("from_area_id")
+  toAreaId         BigInt    @map("to_area_id")
+  quotedPriceLaari BigInt    @map("quoted_price_laari")
+  finalPriceLaari  BigInt?   @map("final_price_laari")
+  taxLaari         BigInt    @default(0) @map("tax_laari")
+  commissionBps    Int?      @map("commission_bps")
+  commissionLaari  BigInt?   @map("commission_laari")
+  paymentMethod    String    @default("cash") @map("payment_method") @db.VarChar(20)
+  paymentStatus    String    @default("pending") @map("payment_status") @db.VarChar(20)
+  status           String    @default("requested") @db.VarChar(40)
+  requestedAt      DateTime  @default(now()) @map("requested_at") @db.DateTime(3)
+  acceptedAt       DateTime? @map("accepted_at") @db.DateTime(3)
+  arrivedAt        DateTime? @map("arrived_at") @db.DateTime(3)
+  startedAt        DateTime? @map("started_at") @db.DateTime(3)
+  completedAt      DateTime? @map("completed_at") @db.DateTime(3)
+  cancelledAt      DateTime? @map("cancelled_at") @db.DateTime(3)
+  cancelReason     String?   @map("cancel_reason") @db.VarChar(500)
+  cancelledBy      String?   @map("cancelled_by") @db.VarChar(32)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   driver      Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
@@ -483,16 +483,16 @@ model Booking {
   fromArea    Area        @relation("BookingFromArea", fields: [fromAreaId], references: [id], onDelete: Restrict)
   toArea      Area        @relation("BookingToArea", fields: [toAreaId], references: [id], onDelete: Restrict)
 
-  offers         BookingOffer[]
-  statusHistory  BookingStatusHistory[]
-  locations      BookingLocation[]
-  payments       Payment[]
-  ledgerEntries  CompanyLedger[]
+  offers          BookingOffer[]
+  statusHistory   BookingStatusHistory[]
+  locations       BookingLocation[]
+  payments        Payment[]
+  ledgerEntries   CompanyLedger[]
   settlementLines SettlementLine[]
-  refunds        Refund[]
-  rating         Rating?
-  riderRating    RiderRating?
-  complaint      Complaint[]
+  refunds         Refund[]
+  rating          Rating?
+  riderRating     RiderRating?
+  complaint       Complaint[]
 
   @@index([riderId])
   @@index([companyId, status])
@@ -504,7 +504,7 @@ model Booking {
 
 model BookingOffer {
   id          BigInt    @id @default(autoincrement())
-  publicId    String    @unique @db.Char(26)
+  publicId    String    @unique @map("public_id") @db.Char(26)
   bookingId   BigInt    @map("booking_id")
   driverId    BigInt    @map("driver_id")
   sentAt      DateTime  @default(now()) @map("sent_at") @db.DateTime(3)
@@ -521,7 +521,7 @@ model BookingOffer {
 
 model BookingStatusHistory {
   id         BigInt   @id @default(autoincrement())
-  publicId   String   @unique @db.Char(26)
+  publicId   String   @unique @map("public_id") @db.Char(26)
   bookingId  BigInt   @map("booking_id")
   fromStatus String?  @map("from_status") @db.VarChar(40)
   toStatus   String   @map("to_status") @db.VarChar(40)
@@ -551,19 +551,19 @@ model BookingLocation {
 // ── Money ──────────────────────────────────────────────────────────────────────
 
 model CommissionRule {
-  id           BigInt    @id @default(autoincrement())
-  publicId     String    @unique @db.Char(26)
-  scope        String    @default("global") @db.VarChar(20)
-  companyId    BigInt?   @map("company_id")
-  percentBps   Int       @map("percent_bps") @db.Int
-  fixedFeeLaari BigInt   @default(0) @map("fixed_fee_laari") @db.BigInt
-  validFrom    DateTime  @default(now()) @map("valid_from") @db.DateTime(3)
-  validTo      DateTime? @map("valid_to") @db.DateTime(3)
-  createdBy    BigInt    @map("created_by")
-  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  id            BigInt    @id @default(autoincrement())
+  publicId      String    @unique @map("public_id") @db.Char(26)
+  scope         String    @default("global") @db.VarChar(20)
+  companyId     BigInt?   @map("company_id")
+  percentBps    Int       @map("percent_bps")
+  fixedFeeLaari BigInt    @default(0) @map("fixed_fee_laari")
+  validFrom     DateTime  @default(now()) @map("valid_from") @db.DateTime(3)
+  validTo       DateTime? @map("valid_to") @db.DateTime(3)
+  createdBy     BigInt    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
 
-  company   Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  createdByUser User  @relation("CommissionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  company          Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdByUser    User     @relation("CommissionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
 
   @@index([scope, validFrom, validTo])
   @@index([companyId])
@@ -572,10 +572,10 @@ model CommissionRule {
 
 model Payment {
   id                BigInt    @id @default(autoincrement())
-  publicId          String    @unique @db.Char(26)
+  publicId          String    @unique @map("public_id") @db.Char(26)
   bookingId         BigInt    @map("booking_id")
   method            String    @default("cash") @db.VarChar(20)
-  amountLaari       BigInt    @map("amount_laari") @db.BigInt
+  amountLaari       BigInt    @map("amount_laari")
   status            String    @default("pending") @db.VarChar(20)
   providerReference String?   @map("provider_reference") @db.VarChar(255)
   paidAt            DateTime? @map("paid_at") @db.DateTime(3)
@@ -590,11 +590,11 @@ model Payment {
 
 model CompanyLedger {
   id              BigInt   @id @default(autoincrement())
-  publicId        String   @unique @db.Char(26)
+  publicId        String   @unique @map("public_id") @db.Char(26)
   companyId       BigInt   @map("company_id")
   type            String   @db.VarChar(32)
-  amountLaari     BigInt   @map("amount_laari") @db.BigInt
-  balanceAfterLaari BigInt @map("balance_after_laari") @db.BigInt
+  amountLaari     BigInt   @map("amount_laari")
+  balanceAfterLaari BigInt @map("balance_after_laari")
   bookingId       BigInt?  @map("booking_id")
   note            String?  @db.VarChar(500)
   createdBy       BigInt?  @map("created_by")
@@ -609,20 +609,20 @@ model CompanyLedger {
 }
 
 model SettlementStatement {
-  id             BigInt    @id @default(autoincrement())
-  publicId       String    @unique @db.Char(26)
-  companyId      BigInt    @map("company_id")
-  periodStart    DateTime  @map("period_start") @db.Date
-  periodEnd      DateTime  @map("period_end") @db.Date
-  totalRides     Int       @default(0) @map("total_rides") @db.Int
-  grossLaari     BigInt    @default(0) @map("gross_laari") @db.BigInt
-  commissionLaari BigInt   @default(0) @map("commission_laari") @db.BigInt
-  netLaari       BigInt    @default(0) @map("net_laari") @db.BigInt
-  status         String    @default("open") @db.VarChar(20)
-  issuedAt       DateTime? @map("issued_at") @db.DateTime(3)
-  paidAt         DateTime? @map("paid_at") @db.DateTime(3)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  id              BigInt    @id @default(autoincrement())
+  publicId        String    @unique @map("public_id") @db.Char(26)
+  companyId       BigInt    @map("company_id")
+  periodStart     DateTime  @map("period_start") @db.Date
+  periodEnd       DateTime  @map("period_end") @db.Date
+  totalRides      Int       @default(0) @map("total_rides")
+  grossLaari      BigInt    @default(0) @map("gross_laari")
+  commissionLaari BigInt    @default(0) @map("commission_laari")
+  netLaari        BigInt    @default(0) @map("net_laari")
+  status          String    @default("open") @db.VarChar(20)
+  issuedAt        DateTime? @map("issued_at") @db.DateTime(3)
+  paidAt          DateTime? @map("paid_at") @db.DateTime(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
   company Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
   lines   SettlementLine[]
@@ -633,12 +633,12 @@ model SettlementStatement {
 }
 
 model SettlementLine {
-  id             BigInt   @id @default(autoincrement())
-  publicId       String   @unique @db.Char(26)
-  statementId    BigInt   @map("statement_id")
-  bookingId      BigInt   @unique @map("booking_id")
-  fareLaari      BigInt   @map("fare_laari") @db.BigInt
-  commissionLaari BigInt  @map("commission_laari") @db.BigInt
+  id              BigInt   @id @default(autoincrement())
+  publicId        String   @unique @map("public_id") @db.Char(26)
+  statementId     BigInt   @map("statement_id")
+  bookingId       BigInt   @unique @map("booking_id")
+  fareLaari       BigInt   @map("fare_laari")
+  commissionLaari BigInt   @map("commission_laari")
 
   statement SettlementStatement @relation(fields: [statementId], references: [id], onDelete: Restrict)
   booking   Booking             @relation(fields: [bookingId], references: [id], onDelete: Restrict)
@@ -649,9 +649,9 @@ model SettlementLine {
 
 model Refund {
   id          BigInt    @id @default(autoincrement())
-  publicId    String    @unique @db.Char(26)
+  publicId    String    @unique @map("public_id") @db.Char(26)
   bookingId   BigInt    @map("booking_id")
-  amountLaari BigInt    @map("amount_laari") @db.BigInt
+  amountLaari BigInt    @map("amount_laari")
   reason      String    @db.VarChar(500)
   approvedBy  BigInt?   @map("approved_by")
   status      String    @default("pending") @db.VarChar(20)
@@ -668,16 +668,16 @@ model Refund {
 // ── Trust, support and system ──────────────────────────────────────────────────
 
 model Rating {
-  id            BigInt   @id @default(autoincrement())
-  publicId      String   @unique @db.Char(26)
-  bookingId     BigInt   @unique @map("booking_id")
-  riderId       BigInt   @map("rider_id")
-  driverId      BigInt   @map("driver_id")
-  companyId     BigInt   @map("company_id")
-  driverScore   Int      @map("driver_score") @db.TinyInt
-  companyScore  Int      @map("company_score") @db.TinyInt
-  comment       String?  @db.Text
-  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  id           BigInt   @id @default(autoincrement())
+  publicId     String   @unique @map("public_id") @db.Char(26)
+  bookingId    BigInt   @unique @map("booking_id")
+  riderId      BigInt   @map("rider_id")
+  driverId     BigInt   @map("driver_id")
+  companyId    BigInt   @map("company_id")
+  driverScore  Int      @map("driver_score") @db.TinyInt
+  companyScore Int      @map("company_score") @db.TinyInt
+  comment      String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
   driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
@@ -690,7 +690,7 @@ model Rating {
 
 model RiderRating {
   id        BigInt   @id @default(autoincrement())
-  publicId  String   @unique @db.Char(26)
+  publicId  String   @unique @map("public_id") @db.Char(26)
   bookingId BigInt   @unique @map("booking_id")
   driverId  BigInt   @map("driver_id")
   riderId   BigInt   @map("rider_id")
@@ -707,7 +707,7 @@ model RiderRating {
 
 model Complaint {
   id          BigInt    @id @default(autoincrement())
-  publicId    String    @unique @db.Char(26)
+  publicId    String    @unique @map("public_id") @db.Char(26)
   bookingId   BigInt?   @map("booking_id")
   raisedBy    BigInt    @map("raised_by")
   againstType String    @map("against_type") @db.VarChar(20)
@@ -729,7 +729,7 @@ model Complaint {
 
 model Notification {
   id        BigInt    @id @default(autoincrement())
-  publicId  String    @unique @db.Char(26)
+  publicId  String    @unique @map("public_id") @db.Char(26)
   userId    BigInt    @map("user_id")
   channel   String    @default("in_app") @db.VarChar(20)
   title     String    @db.VarChar(200)
@@ -747,7 +747,7 @@ model Notification {
 
 model AuditLog {
   id          BigInt   @id @default(autoincrement())
-  publicId    String   @unique @db.Char(26)
+  publicId    String   @unique @map("public_id") @db.Char(26)
   actorUserId BigInt?  @map("actor_user_id")
   action      String   @db.VarChar(100)
   entityType  String   @map("entity_type") @db.VarChar(100)
@@ -767,11 +767,11 @@ model AuditLog {
 }
 
 model PlatformSetting {
-  settingKey String   @id @map("setting_key") @db.VarChar(100)
-  value      Json
-  description String? @db.VarChar(500)
-  updatedBy  BigInt?  @map("updated_by")
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  settingKey  String   @id @map("setting_key") @db.VarChar(100)
+  value       Json
+  description String?  @db.VarChar(500)
+  updatedBy   BigInt?  @map("updated_by")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
   @@map("platform_settings")
 }
