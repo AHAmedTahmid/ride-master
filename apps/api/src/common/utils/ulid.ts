@@ -1,6 +1,12 @@
-import { ulid } from 'ulid'
+import { monotonicFactory } from 'ulid'
 
-/** Generate a new ULID (26-char sortable unique ID). */
+const monotonicUlid = monotonicFactory()
+
+/**
+ * Generate a new ULID (26-char, lexicographically sortable).
+ * Monotonic: consecutive calls in the same millisecond still sort in
+ * creation order — important for using the id as a stable cursor.
+ */
 export function generateUlid(): string {
-  return ulid()
+  return monotonicUlid()
 }

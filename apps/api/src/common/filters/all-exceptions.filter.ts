@@ -15,6 +15,28 @@ import { currentRequestId } from '../context/request-context'
  * All errors leave the API in one envelope:
  *   { statusCode, error, message, requestId, fields? }
  */
+
+/** 'INTERNAL_SERVER_ERROR' → 'Internal Server Error' (standard reason phrase). */
+function statusReason(statusCode: number): string | undefined {
+  const name = HttpStatus[statusCode]
+  if (!name || typeof name !== 'string') return undefined
+  return name
+    .split('_')
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
+/**
+ * Duck-typed ZodError check: vitest/monorepo dependency resolution can give
+ * the API and the shared package different zod instances, breaking instanceof.
+ */
+function isZodError(exception: unknown): exception is ZodError {
+  if (exception instanceof ZodError) return true
+  if (typeof exception !== 'object' || exception === null) return false
+  const candidate = exception as { name?: unknown; issues?: unknown }
+  return candidate.name === 'ZodError' && Array.isArray(candidate.issues)
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name)
@@ -50,7 +72,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     message: string
     fields?: { field: string; message: string }[]
   } {
-    if (exception instanceof ZodError) {
+    if (isZodError(exception)) {
       return {
         statusCode: HttpStatus.BAD_REQUEST,
         error: 'Bad Request',
@@ -69,14 +91,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const obj = res as Record<string, unknown>
         return {
           statusCode,
-          error: (obj.error as string) ?? HttpStatus[statusCode] ?? exception.name,
+          error: (obj.error as string) ?? statusReason(statusCode) ?? exception.name,
           message: (obj.message as string) ?? exception.message,
           ...(obj.fields ? { fields: obj.fields as { field: string; message: string }[] } : {}),
         }
       }
       return {
         statusCode,
-        error: HttpStatus[statusCode] ?? 'Error',
+        error: statusReason(statusCode) ?? 'Error',
         message: String(res),
       }
     }
