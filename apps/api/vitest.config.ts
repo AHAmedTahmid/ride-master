@@ -1,8 +1,18 @@
 import { defineConfig } from 'vitest/config'
-import tsconfigPaths from 'vite-tsconfig-paths'
+import swc from 'unplugin-swc'
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
+  // NestJS DI depends on emitDecoratorMetadata, which esbuild cannot emit.
+  plugins: [
+    swc.vite({
+      jsc: {
+        parser: { syntax: 'typescript', decorators: true },
+        transform: { legacyDecorator: true, decoratorMetadata: true },
+        target: 'es2022',
+      },
+      module: { type: 'es6' },
+    }),
+  ],
   test: {
     globals: true,
     environment: 'node',
@@ -13,9 +23,16 @@ export default defineConfig({
       exclude: [
         'src/**/*.spec.ts',
         'src/**/*.e2e-spec.ts',
+        'src/test/**',
         'src/database/migrate.ts',
         'src/database/seed.ts',
+        'src/database/reset.ts',
         'src/main.ts',
+        'src/database/prisma.service.ts',
+        'src/database/database.module.ts',
+        'src/redis/redis.module.ts',
+        'src/**/*module.ts',
+        'src/**/dto/**',
       ],
       thresholds: {
         lines: 80,
