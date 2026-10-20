@@ -22,6 +22,9 @@
     "db:reset": "pnpm --filter api run db:reset",
     "prepare": "husky"
   },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,md,css}": "prettier --write --ignore-path .gitignore"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.8.0",

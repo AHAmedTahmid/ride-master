@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck:
+    name: Lint & typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ride-master/shared build
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  api-tests:
+    name: API unit + e2e
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: rootsecret
+          MYSQL_USER: ridemaster
+          MYSQL_PASSWORD: secret
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -prootsecret"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=3s
+          --health-retries=8
+    env:
+      DATABASE_URL: mysql://ridemaster:secret@localhost:3306/ride_master
+      DATABASE_URL_TEST: mysql://ridemaster:secret@localhost:3306/ride_master_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_jwt_secret_ci_jwt_secret_ci_jwt_secret_ci_jwt_secret
+      JWT_REFRESH_SECRET: ci_refresh_secret_ci_refresh_secret_ci_refresh_secret_
+      SMS_PROVIDER: console
+      MAP_PROVIDER: haversine
+      STORAGE_PROVIDER: minio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ride-master/shared build
+      - run: pnpm --filter api exec prisma generate
+      - name: Create test database
+        run: mysql -h 127.0.0.1 -u ridemaster -psecret -e 'CREATE DATABASE IF NOT EXISTS ride_master_test CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;'
+      - run: pnpm --filter api db:migrate:test
+      - run: pnpm --filter api test
+      - run: pnpm --filter api test:e2e
+
+  web-build:
+    name: Web build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ride-master/shared build
+      - run: pnpm --filter web test
+      - run: pnpm --filter web build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
