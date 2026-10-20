@@ -1,6 +1,5 @@
 import { ForbiddenException } from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
-import { PrismaService } from '../../database/prisma.service'
 import { AuthController } from './auth.controller'
 import { AuthService, REFRESH_COOKIE } from './auth.service'
 
