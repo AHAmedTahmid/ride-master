@@ -158,7 +158,7 @@ export async function apiFetch<T>(
 
 export const authApi = {
   requestOtp: (phone: string, purpose: 'login' | 'register') =>
-    apiFetch<{ ttlSeconds: number }>('/auth/otp/request', {
+    apiFetch<{ expiresInSeconds: number }>('/auth/otp/request', {
       method: 'POST',
       body: JSON.stringify({ phone, purpose }),
     }),
@@ -221,7 +221,12 @@ export const meApi = {
 }
 
 export const notificationsApi = {
-  list: () => apiFetch<NotificationRow[]>('/notifications'),
+  list: () => apiFetch<NotificationRow[]>('/me/notifications'),
+  markRead: (publicId: string, read = true) =>
+    apiFetch<{ publicId: string; read: boolean }>(`/me/notifications/${publicId}/read`, {
+      method: 'PATCH',
+      body: JSON.stringify({ read }),
+    }),
 }
 
 export const settingsApi = {

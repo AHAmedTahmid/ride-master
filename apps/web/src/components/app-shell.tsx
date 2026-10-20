@@ -6,6 +6,7 @@ import { Link, useRouter } from '@/i18n/navigation'
 import { homePathForRole, useAuth } from '@/lib/auth'
 import { Spinner } from './ui'
 import { LocaleSwitcher, LogoutButton, ThemeToggle } from './header-controls'
+import { RoleSwitcher } from './role-switcher'
 
 /** Wraps every authenticated page: session guard + role-aware chrome. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -61,6 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
           <LocaleSwitcher />
           <ThemeToggle />
+          <RoleSwitcher />
           <LogoutButton />
         </div>
       </header>
