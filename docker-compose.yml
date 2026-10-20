@@ -73,6 +73,40 @@ services:
       - '1025:1025'
       - '8025:8025'
 
+  # ── Application ─────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: ride-master-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql://ridemaster:secret@mysql:3306/ride_master
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - '3001:3001'
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}
+    container_name: ride-master-web
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+
 volumes:
   mysql_data:
   redis_data:
