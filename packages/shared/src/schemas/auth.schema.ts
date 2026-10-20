@@ -7,7 +7,7 @@ const phoneSchema = z
   .trim()
   .transform((val) => {
     // Strip spaces and dashes
-    const cleaned = val.replace(/[\s\-]/g, '')
+    const cleaned = val.replace(/[\s-]/g, '')
     // Already full format
     if (/^\+960\d{7}$/.test(cleaned)) return cleaned
     // Local 7-digit number

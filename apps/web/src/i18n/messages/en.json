@@ -1,0 +1,98 @@
+{
+  "common": {
+    "appName": "Ride Master",
+    "tagline": "Taxi marketplace for the Maldives",
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "retry": "Try again",
+    "logout": "Sign out",
+    "back": "Back",
+    "next": "Continue",
+    "close": "Close",
+    "empty": "Nothing here yet.",
+    "error": "Something went wrong. Please try again.",
+    "networkError": "Cannot reach the server. Check your connection.",
+    "signedInAs": "Signed in as {name}",
+    "activeRole": "Active role: {role}"
+  },
+  "roles": {
+    "superadmin": "Super Admin",
+    "company_owner": "Company owner",
+    "driver": "Driver",
+    "rider": "Rider"
+  },
+  "login": {
+    "title": "Sign in",
+    "phoneTab": "Phone",
+    "adminTab": "Admin",
+    "phoneLabel": "Mobile number",
+    "phonePlaceholder": "7712345",
+    "phoneHelp": "7-digit number or +960 format",
+    "purposeLogin": "I have an account",
+    "purposeRegister": "Create a rider account",
+    "sendCode": "Send code",
+    "codeSent": "Code sent to {phone}.",
+    "codeLabel": "6-digit code",
+    "verify": "Verify and sign in",
+    "noAccount": "No account for this number yet — switch to “Create a rider account”.",
+    "invalidCode": "Invalid or expired code.",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "totpLabel": "Authenticator code",
+    "adminSignIn": "Continue",
+    "totpStep": "Enter the 6-digit code from your authenticator app",
+    "resend": "Resend code",
+    "resendIn": "Resend in {seconds}s"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "admin": "Admin",
+    "audit": "Audit log",
+    "settings": "Settings",
+    "rider": "Rides",
+    "driver": "Driver",
+    "company": "Company",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "theme": "Toggle theme",
+    "language": "Language"
+  },
+  "admin": {
+    "auditTitle": "Audit log",
+    "auditEmpty": "No audit entries yet.",
+    "action": "Action",
+    "actor": "Actor",
+    "entity": "Entity",
+    "ip": "IP",
+    "at": "Time",
+    "settingsTitle": "Platform settings",
+    "settingsEmpty": "No settings rows yet.",
+    "settingKey": "Key",
+    "settingValue": "Value",
+    "settingsSaved": "Settings saved.",
+    "superOnly": "Only super admins can change settings."
+  },
+  "rider": {
+    "title": "Your rides",
+    "upcoming": "Upcoming rides",
+    "past": "Past rides",
+    "bookingNote": "Booking goes live in Phase 3 — the marketplace core is being built now.",
+    "notificationsTitle": "Notifications",
+    "notificationsEmpty": "No notifications."
+  },
+  "driver": {
+    "title": "Driver",
+    "note": "Driver mode goes live in Phase 3 (online toggle, incoming offers, trip flow)."
+  },
+  "company": {
+    "title": "Company",
+    "note": "Fleet management goes live in Phase 4 (vehicles, drivers, settlements)."
+  },
+  "errors": {
+    "notFound": "Page not found",
+    "notFoundBody": "The page you were looking for does not exist.",
+    "forbidden": "You do not have access to this page.",
+    "goHome": "Go to your dashboard"
+  }
+}

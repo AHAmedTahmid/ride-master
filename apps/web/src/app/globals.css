@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Thaana (Faruma) if the font is installed locally; graceful fallback otherwise. */
+.font-thaana {
+  font-family: 'Faruma', 'Noto Sans Thaana', 'Segoe UI', sans-serif;
+}

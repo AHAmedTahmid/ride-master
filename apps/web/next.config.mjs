@@ -1,7 +1,13 @@
+import createNextIntlPlugin from 'next-intl/plugin'
+
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  // Standalone output is what the Docker image runs. Windows dev machines
+  // without symlink privileges can skip it locally with NEXT_OUTPUT=off.
+  ...(process.env.NEXT_OUTPUT === 'off' ? {} : { output: 'standalone' }),
   // Shared package is consumed as TypeScript source from the workspace.
   transpilePackages: ['@ride-master/shared'],
   async headers() {
@@ -17,4 +23,4 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+export default withNextIntl(nextConfig)

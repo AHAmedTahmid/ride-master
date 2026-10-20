@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ride Master">
+  <rect width="64" height="64" rx="14" fill="#1b6ef5" />
+  <path d="M16 40V28l6-10h20l6 10v12h-4v-3a4 4 0 0 0-8 0v3H28v-3a4 4 0 0 0-8 0v3h-4z" fill="#fff" />
+  <circle cx="24" cy="40" r="3" fill="#142857" />
+  <circle cx="40" cy="40" r="3" fill="#142857" />
+</svg>

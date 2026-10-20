@@ -1,0 +1,17 @@
+{
+  "name": "Ride Master",
+  "short_name": "Ride Master",
+  "description": "Taxi marketplace for the Maldives",
+  "start_url": "/en",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1b6ef5",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
