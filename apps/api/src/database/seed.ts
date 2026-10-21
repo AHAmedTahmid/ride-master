@@ -44,11 +44,56 @@ interface AreaSeed {
 }
 
 const AREAS: AreaSeed[] = [
-  { key: 'male', nameEn: 'Malé City', nameDv: 'މާލެނިކަރު', type: 'city', centerLng: 73.5093, centerLat: 4.1755, halfLng: 0.03, halfLat: 0.02 },
-  { key: 'hulhumale', nameEn: 'Hulhumalé', nameDv: 'ހުޅުމާލެ', type: 'city', centerLng: 73.5309, centerLat: 4.2269, halfLng: 0.025, halfLat: 0.03 },
-  { key: 'airport', nameEn: 'Velana International Airport', nameDv: 'ވެލަނަ އިންޓަރްނަޘަލް އެއަޅްޕޯށް', type: 'airport', centerLng: 73.5297, centerLat: 4.1918, halfLng: 0.01, halfLat: 0.01 },
-  { key: 'maafushi', nameEn: 'Maafushi', nameDv: 'މާފުށި', type: 'island', centerLng: 73.4717, centerLat: 3.9734, halfLng: 0.012, halfLat: 0.008 },
-  { key: 'villingili', nameEn: 'Villingili', nameDv: 'ވިލިންގިލި', type: 'island', centerLng: 73.4892, centerLat: 4.1766, halfLng: 0.01, halfLat: 0.008 },
+  {
+    key: 'male',
+    nameEn: 'Malé City',
+    nameDv: 'މާލެނިކަރު',
+    type: 'city',
+    centerLng: 73.5093,
+    centerLat: 4.1755,
+    halfLng: 0.03,
+    halfLat: 0.02,
+  },
+  {
+    key: 'hulhumale',
+    nameEn: 'Hulhumalé',
+    nameDv: 'ހުޅުމާލެ',
+    type: 'city',
+    centerLng: 73.5309,
+    centerLat: 4.2269,
+    halfLng: 0.025,
+    halfLat: 0.03,
+  },
+  {
+    key: 'airport',
+    nameEn: 'Velana International Airport',
+    nameDv: 'ވެލަނަ އިންޓަރްނަޘަލް އެއަޅްޕޯށް',
+    type: 'airport',
+    centerLng: 73.5297,
+    centerLat: 4.1918,
+    halfLng: 0.01,
+    halfLat: 0.01,
+  },
+  {
+    key: 'maafushi',
+    nameEn: 'Maafushi',
+    nameDv: 'މާފުށި',
+    type: 'island',
+    centerLng: 73.4717,
+    centerLat: 3.9734,
+    halfLng: 0.012,
+    halfLat: 0.008,
+  },
+  {
+    key: 'villingili',
+    nameEn: 'Villingili',
+    nameDv: 'ވިލިންގިލި',
+    type: 'island',
+    centerLng: 73.4892,
+    centerLat: 4.1766,
+    halfLng: 0.01,
+    halfLat: 0.008,
+  },
 ]
 
 interface VehicleSeed {
@@ -98,10 +143,30 @@ const DRIVERS: DriverSeed[] = [
 ]
 
 const SUP_ADMINS = [
-  { fullName: 'Super Administrator', phone: '+9609990001', email: 'super@ridemaster.mv', level: 'super' },
-  { fullName: 'Verification Officer', phone: '+9609990002', email: 'verifier@ridemaster.mv', level: 'verifier' },
-  { fullName: 'Support Agent', phone: '+9609990003', email: 'support@ridemaster.mv', level: 'support' },
-  { fullName: 'Finance Officer', phone: '+9609990004', email: 'finance@ridemaster.mv', level: 'finance' },
+  {
+    fullName: 'Super Administrator',
+    phone: '+9609990001',
+    email: 'super@ridemaster.mv',
+    level: 'super',
+  },
+  {
+    fullName: 'Verification Officer',
+    phone: '+9609990002',
+    email: 'verifier@ridemaster.mv',
+    level: 'verifier',
+  },
+  {
+    fullName: 'Support Agent',
+    phone: '+9609990003',
+    email: 'support@ridemaster.mv',
+    level: 'support',
+  },
+  {
+    fullName: 'Finance Officer',
+    phone: '+9609990004',
+    email: 'finance@ridemaster.mv',
+    level: 'finance',
+  },
 ] as const
 
 const OWNERS = [
@@ -112,9 +177,24 @@ const OWNERS = [
 ]
 
 const COMPANIES = [
-  { name: 'Azure Cabs', tradeName: 'Azure Cabs Pvt Ltd', registrationNumber: 'MZ-PV-10021', licenceNumber: 'OP-AZ-0001' },
-  { name: 'Sunset Transfers', tradeName: 'Sunset Transfers Pvt Ltd', registrationNumber: 'MZ-PV-10047', licenceNumber: 'OP-ST-0002' },
-  { name: 'Atoll Rides', tradeName: 'Atoll Rides Pvt Ltd', registrationNumber: 'MZ-PV-10063', licenceNumber: 'OP-AR-0003' },
+  {
+    name: 'Azure Cabs',
+    tradeName: 'Azure Cabs Pvt Ltd',
+    registrationNumber: 'MZ-PV-10021',
+    licenceNumber: 'OP-AZ-0001',
+  },
+  {
+    name: 'Sunset Transfers',
+    tradeName: 'Sunset Transfers Pvt Ltd',
+    registrationNumber: 'MZ-PV-10047',
+    licenceNumber: 'OP-ST-0002',
+  },
+  {
+    name: 'Atoll Rides',
+    tradeName: 'Atoll Rides Pvt Ltd',
+    registrationNumber: 'MZ-PV-10063',
+    licenceNumber: 'OP-AR-0003',
+  },
   { name: 'Hassan Ali', tradeName: null, registrationNumber: null, licenceNumber: 'OP-IN-0004' },
 ]
 
@@ -234,13 +314,6 @@ async function seedOwnersAndCompanies(superadminId: bigint, areaIds: Map<string,
         phone: o.phone,
         email: o.email,
         status: 'active',
-        roles: {
-          create: {
-            publicId: ulid(),
-            role: 'company_owner',
-            status: 'active',
-          },
-        },
       },
     })
     ownerRows.push(user)
@@ -269,6 +342,17 @@ async function seedOwnersAndCompanies(superadminId: bigint, areaIds: Map<string,
         },
       },
     })
+    // The owner role must carry company_id — auth resolves the company scope
+    // from this row, never from the request.
+    await prisma.userRole.create({
+      data: {
+        publicId: ulid(),
+        userId: ownerRows[i].id,
+        role: 'company_owner',
+        companyId: company.id,
+        status: 'active',
+      },
+    })
     companyIds.push(company.id)
     console.info(`[seed] ${individual ? 'individual' : 'company '} ${c.name}`)
   }
@@ -291,7 +375,9 @@ async function seedRiders() {
 }
 
 async function seedDriversAndFleet(companyIds: bigint[], vehicleTypeIds: bigint[]) {
-  const owners = await prisma.user.findMany({ where: { phone: { in: OWNERS.map((o) => o.phone) } } })
+  const owners = await prisma.user.findMany({
+    where: { phone: { in: OWNERS.map((o) => o.phone) } },
+  })
   const ownerByPhone = new Map(owners.map((o) => [o.phone, o]))
 
   for (const [i, d] of DRIVERS.entries()) {
@@ -412,7 +498,9 @@ async function seedSuggestedFares(
     }
   }
   await prisma.suggestedFare.createMany({ data: rows })
-  console.info(`[seed] ${rows.length} suggested fares (${areas.length * (areas.length - 1)} route pairs × 3 vehicle types)`)
+  console.info(
+    `[seed] ${rows.length} suggested fares (${areas.length * (areas.length - 1)} route pairs × 3 vehicle types)`,
+  )
 }
 
 async function seedCommissionRule(superadminId: bigint) {
@@ -453,7 +541,9 @@ async function main() {
   console.info('[seed] Done. Demo credentials (development only):')
   console.info(`[seed]   Superadmin password: ${ADMIN_PASSWORD}`)
   console.info('[seed]   Superadmin logins: super@ / verifier@ / support@ / finance@ridemaster.mv')
-  console.info('[seed]   Riders log in by phone OTP (any +960 number works — codes print to the API console).')
+  console.info(
+    '[seed]   Riders log in by phone OTP (any +960 number works — codes print to the API console).',
+  )
 }
 
 main()
