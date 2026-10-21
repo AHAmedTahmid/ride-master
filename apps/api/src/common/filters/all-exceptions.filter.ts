@@ -37,6 +37,14 @@ function isZodError(exception: unknown): exception is ZodError {
   return candidate.name === 'ZodError' && Array.isArray(candidate.issues)
 }
 
+/** Multer upload errors (duck-typed: no shared @types dependency). */
+function multerCode(exception: unknown): string | undefined {
+  if (typeof exception !== 'object' || exception === null) return undefined
+  const candidate = exception as { name?: unknown; code?: unknown }
+  if (candidate.name !== 'MulterError') return undefined
+  return typeof candidate.code === 'string' ? candidate.code : undefined
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name)
@@ -81,6 +89,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
           field: i.path.join('.') || '(root)',
           message: i.message,
         })),
+      }
+    }
+
+    const code = multerCode(exception)
+    if (code) {
+      const tooLarge = code === 'LIMIT_FILE_SIZE'
+      return {
+        statusCode: tooLarge ? HttpStatus.PAYLOAD_TOO_LARGE : HttpStatus.BAD_REQUEST,
+        error: tooLarge ? 'Payload Too Large' : 'Bad Request',
+        message: tooLarge ? 'File exceeds the maximum allowed size' : `Upload rejected: ${code}`,
       }
     }
 

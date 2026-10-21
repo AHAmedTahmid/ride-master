@@ -48,9 +48,7 @@ describe('AllExceptionsFilter', () => {
     const { host, status, json } = makeHost()
     filter.catch(new HttpException('Nope', HttpStatus.FORBIDDEN), host)
     expect(status).toHaveBeenCalledWith(403)
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 403, message: 'Nope' }),
-    )
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, message: 'Nope' }))
   })
 
   it('uses HTTP status names for the error label on guard exceptions', () => {
@@ -70,9 +68,7 @@ describe('AllExceptionsFilter', () => {
       ),
       host,
     )
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'Bad Request', fields: [] }),
-    )
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Bad Request', fields: [] }))
   })
 
   it('hides unknown errors behind a generic 500 envelope', () => {
@@ -84,6 +80,35 @@ describe('AllExceptionsFilter', () => {
       error: 'Internal Server Error',
       message: 'An unexpected error occurred',
     })
+  })
+
+  it('maps multer size errors to 413 in the shared envelope', () => {
+    const { host, status, json } = makeHost()
+    const err = Object.assign(new Error('File too large'), {
+      name: 'MulterError',
+      code: 'LIMIT_FILE_SIZE',
+    })
+    filter.catch(err, host)
+    expect(status).toHaveBeenCalledWith(413)
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 413, error: 'Payload Too Large' }),
+    )
+  })
+
+  it('maps other multer errors to 400', () => {
+    const { host, status, json } = makeHost()
+    const err = Object.assign(new Error('Unexpected field'), {
+      name: 'MulterError',
+      code: 'LIMIT_UNEXPECTED_FILE',
+    })
+    filter.catch(err, host)
+    expect(status).toHaveBeenCalledWith(400)
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        message: 'Upload rejected: LIMIT_UNEXPECTED_FILE',
+      }),
+    )
   })
 
   it('echoes x-request-id when no AsyncLocalStorage id exists', () => {
