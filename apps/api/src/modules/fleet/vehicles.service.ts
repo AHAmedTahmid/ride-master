@@ -120,9 +120,6 @@ export class VehiclesService {
     const row = await this.requireVehicle(vehiclePublicId, companyId)
 
     const data: Prisma.VehicleUpdateInput = {}
-    if (dto.vehicleTypeId !== undefined) {
-      data.vehicleType = { connect: { id: await this.requireVehicleType(dto.vehicleTypeId) } }
-    }
     if (dto.plateNumber !== undefined) data.plateNumber = dto.plateNumber
     if (dto.make !== undefined) data.make = dto.make
     if (dto.model !== undefined) data.model = dto.model
