@@ -60,3 +60,12 @@ export const SETTINGS_KEYS = {
   DAILY_SMS_BUDGET: 'daily_sms_budget',
   BOOKING_LOCATIONS_RETENTION_DAYS: 'booking_locations_retention_days',
 } as const
+
+/** Max bytes accepted for a company document upload (5 MB). */
+export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
+
+/** Accepted document content types. */
+export const DOCUMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const
+
+/** How long a document signed URL stays valid. */
+export const DOCUMENT_URL_TTL_SECONDS = 600
