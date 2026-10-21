@@ -10,6 +10,7 @@ import { UsersModule } from './modules/users/users.module'
 import { AuditModule } from './modules/audit/audit.module'
 import { SettingsModule } from './modules/settings/settings.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
+import { CompaniesModule } from './modules/companies/companies.module'
 import { SmsModule } from './providers/sms/sms.module'
 import { MapModule } from './providers/map/map.module'
 import { StorageModule } from './providers/storage/storage.module'
@@ -51,6 +52,7 @@ import { HealthModule } from './modules/health/health.module'
     AuditModule,
     SettingsModule,
     NotificationsModule,
+    CompaniesModule,
     HealthModule,
   ],
 })
