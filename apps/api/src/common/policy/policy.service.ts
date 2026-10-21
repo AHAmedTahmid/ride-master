@@ -1,5 +1,11 @@
-import { ForbiddenException, Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { AuthContext } from '../decorators/auth.decorators'
+import { PrismaService } from '../../database/prisma.service'
 
 /**
  * Policy layer — the single place that answers "may this actor touch this
@@ -8,6 +14,7 @@ import { AuthContext } from '../decorators/auth.decorators'
  */
 @Injectable()
 export class PolicyService {
+  constructor(private readonly prisma?: PrismaService) {}
   /**
    * Company owners and drivers may only act inside their own company.
    * Superadmins may act anywhere. Riders/other roles never pass.
@@ -47,5 +54,34 @@ export class PolicyService {
     if (auth.activeRole !== 'superadmin') {
       throw new ForbiddenException('Superadmin access required')
     }
+  }
+
+  /**
+   * Target company for fleet/pricing operations (vehicles, drivers, fares):
+   * - company roles act on their own company; an explicit ?company= public id
+   *   must match their own (or 403 — no silent cross-company writes).
+   * - superadmins must name the company explicitly — there is never a
+   *   default company for an admin request.
+   * Never accepts a company id from a request body.
+   */
+  async resolveTargetCompanyId(auth: AuthContext, companyPublicId?: string): Promise<bigint> {
+    if (auth.activeRole === 'superadmin') {
+      if (!companyPublicId) {
+        throw new BadRequestException('company query parameter is required for superadmin requests')
+      }
+      if (!this.prisma) throw new Error('PolicyService requires PrismaService')
+      const company = await this.prisma.company.findFirst({
+        where: { publicId: companyPublicId, deletedAt: null },
+        select: { id: true },
+      })
+      if (!company) throw new NotFoundException('Company not found')
+      return company.id
+    }
+
+    const own = this.resolveCompanyId(auth)
+    if (companyPublicId && companyPublicId !== auth.companyPublicId) {
+      throw new ForbiddenException('You cannot access another company\u2019s data')
+    }
+    return own
   }
 }

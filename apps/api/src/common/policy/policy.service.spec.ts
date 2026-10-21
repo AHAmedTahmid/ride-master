@@ -1,5 +1,5 @@
-import { ForbiddenException } from '@nestjs/common'
-import { describe, expect, it } from 'vitest'
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
+import { describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '../decorators/auth.decorators'
 import { PolicyService } from './policy.service'
 
@@ -65,9 +65,7 @@ describe('PolicyService', () => {
 
     it('blocks a rider entirely (negative case)', () => {
       const auth = makeAuth({ activeRole: 'rider', roles: ['rider'] })
-      expect(() => policy.requireCompanyScope(auth, 'CO1')).toThrow(
-        /role has no company scope/,
-      )
+      expect(() => policy.requireCompanyScope(auth, 'CO1')).toThrow(/role has no company scope/)
     })
 
     it('blocks a company-linked actor whose session lost the company', () => {
@@ -82,9 +80,7 @@ describe('PolicyService', () => {
     })
 
     it('throws when the actor has no company', () => {
-      expect(() => policy.resolveCompanyId(makeAuth({}))).toThrow(
-        /not linked to a company/,
-      )
+      expect(() => policy.resolveCompanyId(makeAuth({}))).toThrow(/not linked to a company/)
     })
   })
 
@@ -107,9 +103,7 @@ describe('PolicyService', () => {
 
   describe('requireSuperadmin', () => {
     it('lets any superadmin through', () => {
-      expect(() =>
-        policy.requireSuperadmin(makeAuth({ activeRole: 'superadmin' })),
-      ).not.toThrow()
+      expect(() => policy.requireSuperadmin(makeAuth({ activeRole: 'superadmin' }))).not.toThrow()
     })
 
     it('blocks every other role (negative cases)', () => {
@@ -118,6 +112,88 @@ describe('PolicyService', () => {
           ForbiddenException,
         )
       }
+    })
+  })
+
+  describe('resolveTargetCompanyId', () => {
+    function withPrisma(company: { id: bigint } | null) {
+      const prisma = { company: { findFirst: vi.fn(async () => company) } }
+      return { policy: new PolicyService(prisma as never), prisma }
+    }
+
+    it('superadmin must name the company explicitly (no default)', async () => {
+      const { policy } = withPrisma({ id: 42n })
+      await expect(
+        policy.resolveTargetCompanyId(makeAuth({ activeRole: 'superadmin' })),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('superadmin resolves the named company', async () => {
+      const { policy, prisma } = withPrisma({ id: 42n })
+      await expect(
+        policy.resolveTargetCompanyId(makeAuth({ activeRole: 'superadmin' }), 'CO1'),
+      ).resolves.toBe(42n)
+      expect(prisma.company.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { publicId: 'CO1', deletedAt: null } }),
+      )
+    })
+
+    it('superadmin gets 404 for an unknown company', async () => {
+      const { policy } = withPrisma(null)
+      await expect(
+        policy.resolveTargetCompanyId(makeAuth({ activeRole: 'superadmin' }), 'NOPE'),
+      ).rejects.toThrow(NotFoundException)
+    })
+
+    it('owner gets their own company without a query param', async () => {
+      const { policy } = withPrisma(null)
+      await expect(
+        policy.resolveTargetCompanyId(
+          makeAuth({
+            activeRole: 'company_owner',
+            roles: ['company_owner'],
+            companyId: 7n,
+            companyPublicId: 'CO1',
+          }),
+        ),
+      ).resolves.toBe(7n)
+    })
+
+    it('owner passing a foreign company public id is forbidden (negative case)', async () => {
+      const { policy } = withPrisma(null)
+      await expect(
+        policy.resolveTargetCompanyId(
+          makeAuth({
+            activeRole: 'company_owner',
+            roles: ['company_owner'],
+            companyId: 7n,
+            companyPublicId: 'CO1',
+          }),
+          'OTHER',
+        ),
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('owner matching their own public id is allowed', async () => {
+      const { policy } = withPrisma(null)
+      await expect(
+        policy.resolveTargetCompanyId(
+          makeAuth({
+            activeRole: 'company_owner',
+            roles: ['company_owner'],
+            companyId: 7n,
+            companyPublicId: 'CO1',
+          }),
+          'CO1',
+        ),
+      ).resolves.toBe(7n)
+    })
+
+    it('actor without a company link is forbidden', async () => {
+      const { policy } = withPrisma(null)
+      await expect(
+        policy.resolveTargetCompanyId(makeAuth({ activeRole: 'driver', roles: ['driver'] })),
+      ).rejects.toThrow(ForbiddenException)
     })
   })
 })
