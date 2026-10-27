@@ -12,6 +12,7 @@ import { SettingsModule } from './modules/settings/settings.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { CompaniesModule } from './modules/companies/companies.module'
 import { FleetModule } from './modules/fleet/fleet.module'
+import { CatalogModule } from './modules/catalog/catalog.module'
 import { SmsModule } from './providers/sms/sms.module'
 import { MapModule } from './providers/map/map.module'
 import { StorageModule } from './providers/storage/storage.module'
@@ -55,6 +56,7 @@ import { HealthModule } from './modules/health/health.module'
     NotificationsModule,
     CompaniesModule,
     FleetModule,
+    CatalogModule,
     HealthModule,
   ],
 })
