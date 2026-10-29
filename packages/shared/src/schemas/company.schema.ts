@@ -183,6 +183,10 @@ export const UpdateSurchargeSchema = z
     }
   })
 
+export const ImportSuggestedFareSchema = z.object({
+  suggestedFarePublicId: z.string().min(1),
+})
+
 export type CreateCompanyDto = z.infer<typeof CreateCompanySchema>
 export type UpdateCompanyDto = z.infer<typeof UpdateCompanySchema>
 export type UploadDocumentDto = z.infer<typeof UploadDocumentSchema>
@@ -191,5 +195,6 @@ export type RejectCompanyDto = z.infer<typeof RejectCompanySchema>
 export type SuspendCompanyDto = z.infer<typeof SuspendCompanySchema>
 export type CreateFareDto = z.infer<typeof CreateFareSchema>
 export type UpdateFareDto = z.infer<typeof UpdateFareSchema>
+export type ImportSuggestedFareDto = z.infer<typeof ImportSuggestedFareSchema>
 export type CreateSurchargeDto = z.infer<typeof CreateSurchargeSchema>
 export type UpdateSurchargeDto = z.infer<typeof UpdateSurchargeSchema>

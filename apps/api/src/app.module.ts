@@ -13,6 +13,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { CompaniesModule } from './modules/companies/companies.module'
 import { FleetModule } from './modules/fleet/fleet.module'
 import { CatalogModule } from './modules/catalog/catalog.module'
+import { PricingModule } from './modules/pricing/pricing.module'
 import { SmsModule } from './providers/sms/sms.module'
 import { MapModule } from './providers/map/map.module'
 import { StorageModule } from './providers/storage/storage.module'
@@ -57,6 +58,7 @@ import { HealthModule } from './modules/health/health.module'
     CompaniesModule,
     FleetModule,
     CatalogModule,
+    PricingModule,
     HealthModule,
   ],
 })
