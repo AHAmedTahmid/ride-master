@@ -17,8 +17,9 @@ export const TEST_ADMIN_PASSWORD = 'TestAdmin#123'
 
 export const FIXTURES = {
   rider: { phone: '+9609991001', name: 'Rider One' },
-  owner: { phone: '+9609991002', name: 'Owner One' },
+  owner2: { phone: '+9609991004', name: 'Owner Two' },
   driver: { phone: '+9609991003', name: 'Driver One' },
+  driver2: { phone: '+9609991005', name: 'Driver Two' },
   superadmins: {
     super: 'super@test.local',
     verifier: 'verifier@test.local',
@@ -81,6 +82,20 @@ async function seedFixtures(): Promise<void> {
       },
     })
 
+    // Seed Areas & Vehicle Types
+    const area = await prisma.area.create({
+      data: {
+        publicId: 'A-MALE',
+        nameEn: 'Male',
+        nameDv: 'Malé',
+        geometry: 'POLYGON((0 0,0 1,1 1,1 0,0 0))',
+      },
+    })
+    const vType = await prisma.vehicleType.create({
+      data: { publicId: 'VT-CAR', name: 'Car', seats: 4 },
+    })
+
+    // Company 1
     const owner = await prisma.user.create({
       data: {
         publicId: generateUlid(),
@@ -121,6 +136,51 @@ async function seedFixtures(): Promise<void> {
         language: 'en',
         roles: {
           create: { publicId: generateUlid(), role: 'driver', companyId: company.id },
+        },
+      },
+    })
+
+    // Company 2
+    const owner2 = await prisma.user.create({
+      data: {
+        publicId: generateUlid(),
+        fullName: FIXTURES.owner2.name,
+        phone: FIXTURES.owner2.phone,
+        language: 'en',
+      },
+    })
+
+    const company2 = await prisma.company.create({
+      data: {
+        publicId: generateUlid(),
+        ownerUserId: owner2.id,
+        name: 'Blue Cabs',
+        tradeName: 'Blue Cabs Pvt Ltd',
+        licenceNumber: 'OP-BL-0002',
+        phone: FIXTURES.owner2.phone,
+        type: 'company',
+        status: 'approved',
+        isDemo: true,
+      },
+    })
+
+    await prisma.userRole.create({
+      data: {
+        publicId: generateUlid(),
+        userId: owner2.id,
+        role: 'company_owner',
+        companyId: company2.id,
+      },
+    })
+
+    await prisma.user.create({
+      data: {
+        publicId: generateUlid(),
+        fullName: FIXTURES.driver2.name,
+        phone: FIXTURES.driver2.phone,
+        language: 'en',
+        roles: {
+          create: { publicId: generateUlid(), role: 'driver', companyId: company2.id },
         },
       },
     })
